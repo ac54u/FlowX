@@ -3,6 +3,7 @@
 //  TrollSpeed
 //
 //  Created by Lessica on 2024/1/24.
+//  Modified with Modern Inset Grouped UI
 //
 
 #import <notify.h>
@@ -18,11 +19,6 @@
 #define HUD_TRANSITION_DURATION 0.25
 
 static BOOL _gShouldToggleHUDAfterLaunch = NO;
-static const CGFloat _gTopButtonConstraintsConstantCompact = 46.f;
-static const CGFloat _gTopButtonConstraintsConstantRegular = 28.f;
-static const CGFloat _gTopButtonConstraintsConstantRegularPad = 46.f;
-static const CGFloat _gAuthorLabelBottomConstraintConstantCompact = -20.f;
-static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
 
 @implementation RootViewController {
     NSMutableDictionary *_userDefaults;
@@ -73,162 +69,167 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(toggleHUDNotificationReceived:) name:kToggleHUDAfterLaunchNotificationName object:nil];
 }
 
+// ==========================================
+// 全新重写的现代化卡片式 UI (Inset Grouped)
+// ==========================================
 - (void)loadView
 {
     CGRect bounds = UIScreen.mainScreen.bounds;
-
     self.view = [[UIView alloc] initWithFrame:bounds];
-    self.view.backgroundColor = [UIColor colorWithRed:0.0f / 255.0f green:0.0f / 255.0f blue:0.0f / 255.0f alpha:.580f / 1.0f];  // rgba(0, 0, 0, 0.580)
 
+    // 1. 系统分组背景色（自动完美适配深色/浅色模式）
     self.backgroundView = [[UIView alloc] initWithFrame:bounds];
     self.backgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    self.backgroundView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
-        if ([traitCollection userInterfaceStyle] == UIUserInterfaceStyleDark) {
-            return [UIColor colorWithRed:28/255.0 green:74/255.0 blue:82/255.0 alpha:1.0];  // rgba(28, 74, 82, 1.0)
-        } else {
-            return [UIColor colorWithRed:26/255.0 green:188/255.0 blue:156/255.0 alpha:1.0];  // rgba(26, 188, 156, 1.0)
-        }
-    }];
+    self.backgroundView.backgroundColor = [UIColor systemGroupedBackgroundColor];
     [self.view addSubview:self.backgroundView];
 
-    _topLeftButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_topLeftButton setTintColor:[UIColor whiteColor]];
-    [_topLeftButton addTarget:self action:@selector(tapTopLeftButton:) forControlEvents:UIControlEventTouchUpInside];
-    [_topLeftButton setImage:[UIImage systemImageNamed:@"arrow.up.left"] forState:UIControlStateNormal];
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [_topLeftButton setAdjustsImageWhenHighlighted:NO];
-#pragma clang diagnostic pop
-    [self.backgroundView addSubview:_topLeftButton];
-    if (@available(iOS 15.0, *))
-    {
-        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
-        [config setCornerStyle:UIButtonConfigurationCornerStyleLarge];
-        [_topLeftButton setConfiguration:config];
-    }
     UILayoutGuide *safeArea = self.backgroundView.safeAreaLayoutGuide;
-    [_topLeftButton setTranslatesAutoresizingMaskIntoConstraints:NO];
-    _topLeftConstraint = [_topLeftButton.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:_gTopButtonConstraintsConstantRegular];
-    [NSLayoutConstraint activateConstraints:@[
-        _topLeftConstraint,
-        [_topLeftButton.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:20.0f],
-        [_topLeftButton.widthAnchor constraintEqualToConstant:40.0f],
-        [_topLeftButton.heightAnchor constraintEqualToConstant:40.0f],
-    ]];
 
-    _topRightButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_topRightButton setTintColor:[UIColor whiteColor]];
-    [_topRightButton addTarget:self action:@selector(tapTopRightButton:) forControlEvents:UIControlEventTouchUpInside];
-    [_topRightButton setImage:[UIImage systemImageNamed:@"arrow.up.right"] forState:UIControlStateNormal];
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [_topRightButton setAdjustsImageWhenHighlighted:NO];
-#pragma clang diagnostic pop
-    [self.backgroundView addSubview:_topRightButton];
-    if (@available(iOS 15.0, *))
-    {
-        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
-        [config setCornerStyle:UIButtonConfigurationCornerStyleLarge];
-        [_topRightButton setConfiguration:config];
+    // 2. iOS 原生大标题
+    UILabel *headerLabel = [[UILabel alloc] init];
+    headerLabel.text = @"TrollSpeed";
+    headerLabel.font = [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
+    headerLabel.textColor = [UIColor labelColor];
+    [headerLabel setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [self.backgroundView addSubview:headerLabel];
+
+    // 3. 核心控制卡片 (Main Card)
+    UIView *mainCard = [[UIView alloc] init];
+    mainCard.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+    mainCard.layer.cornerRadius = 16.0;
+    mainCard.layer.cornerCurve = kCACornerCurveContinuous; // 苹果专属平滑圆角
+    mainCard.layer.shadowColor = [UIColor blackColor].CGColor;
+    mainCard.layer.shadowOpacity = 0.05;
+    mainCard.layer.shadowOffset = CGSizeMake(0, 4);
+    mainCard.layer.shadowRadius = 10;
+    [mainCard setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [self.backgroundView addSubview:mainCard];
+
+    // 巨大的核心开关
+    _mainButton = [MainButton buttonWithType:UIButtonTypeSystem];
+    [_mainButton addTarget:self action:@selector(tapMainButton:) forControlEvents:UIControlEventTouchUpInside];
+    if (@available(iOS 15.0, *)) {
+        UIButtonConfiguration *config = [UIButtonConfiguration tintedButtonConfiguration];
+        config.cornerStyle = UIButtonConfigurationCornerStyleLarge;
+        config.titleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey,id> * _Nonnull(NSDictionary<NSAttributedStringKey,id> * _Nonnull textAttributes) {
+            NSMutableDictionary *newAttributes = [textAttributes mutableCopy];
+            [newAttributes setObject:[UIFont boldSystemFontOfSize:22.0] forKey:NSFontAttributeName];
+            return newAttributes;
+        };
+        [_mainButton setConfiguration:config];
+    } else {
+        [_mainButton.titleLabel setFont:[UIFont boldSystemFontOfSize:22.0]];
     }
-    [_topRightButton setTranslatesAutoresizingMaskIntoConstraints:NO];
-    _topRightConstraint = [_topRightButton.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:_gTopButtonConstraintsConstantRegular];
-    [NSLayoutConstraint activateConstraints:@[
-        _topRightConstraint,
-        [_topRightButton.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-20.0f],
-        [_topRightButton.widthAnchor constraintEqualToConstant:40.0f],
-        [_topRightButton.heightAnchor constraintEqualToConstant:40.0f],
-    ]];
+    [_mainButton setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [mainCard addSubview:_mainButton];
 
-    _topCenterButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_topCenterButton setTintColor:[UIColor whiteColor]];
+    // 4. 位置选择卡片 (Position Card)
+    UIView *positionCard = [[UIView alloc] init];
+    positionCard.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+    positionCard.layer.cornerRadius = 16.0;
+    positionCard.layer.cornerCurve = kCACornerCurveContinuous;
+    positionCard.layer.shadowColor = [UIColor blackColor].CGColor;
+    positionCard.layer.shadowOpacity = 0.05;
+    positionCard.layer.shadowOffset = CGSizeMake(0, 4);
+    positionCard.layer.shadowRadius = 10;
+    [positionCard setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [self.backgroundView addSubview:positionCard];
+
+    // 辅助方法：快速创建位置按钮
+    UIButton *(^createPosButton)(NSString *) = ^UIButton *(NSString *iconName) {
+        UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+        [btn setImage:[UIImage systemImageNamed:iconName] forState:UIControlStateNormal];
+        if (@available(iOS 15.0, *)) {
+            UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
+            [btn setConfiguration:config];
+        }
+        [btn setTranslatesAutoresizingMaskIntoConstraints:NO];
+        return btn;
+    };
+
+    _topLeftButton = createPosButton(@"arrow.up.left");
+    [_topLeftButton addTarget:self action:@selector(tapTopLeftButton:) forControlEvents:UIControlEventTouchUpInside];
+    [positionCard addSubview:_topLeftButton];
+
+    _topCenterButton = createPosButton(@"arrow.up");
     [_topCenterButton addTarget:self action:@selector(tapTopCenterButton:) forControlEvents:UIControlEventTouchUpInside];
-    [_topCenterButton setImage:[UIImage systemImageNamed:@"arrow.up"] forState:UIControlStateNormal];
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [_topCenterButton setAdjustsImageWhenHighlighted:NO];
-#pragma clang diagnostic pop
-    [self.backgroundView addSubview:_topCenterButton];
-    if (@available(iOS 15.0, *))
-    {
-        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
-        [config setCornerStyle:UIButtonConfigurationCornerStyleLarge];
-        [_topCenterButton setConfiguration:config];
-    }
-    [_topCenterButton setTranslatesAutoresizingMaskIntoConstraints:NO];
-    _topCenterConstraint = [_topCenterButton.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:_gTopButtonConstraintsConstantRegular];
-    [NSLayoutConstraint activateConstraints:@[
-        _topCenterConstraint,
-        [_topCenterButton.centerXAnchor constraintEqualToAnchor:safeArea.centerXAnchor],
-        [_topCenterButton.widthAnchor constraintEqualToConstant:40.0f],
-        [_topCenterButton.heightAnchor constraintEqualToConstant:40.0f],
-    ]];
+    [positionCard addSubview:_topCenterButton];
+
+    _topRightButton = createPosButton(@"arrow.up.right");
+    [_topRightButton addTarget:self action:@selector(tapTopRightButton:) forControlEvents:UIControlEventTouchUpInside];
+    [positionCard addSubview:_topRightButton];
 
     [self reloadModeButtonState];
 
-    _mainButton = [MainButton buttonWithType:UIButtonTypeSystem];
-    [_mainButton setTintColor:[UIColor whiteColor]];
-    [_mainButton addTarget:self action:@selector(tapMainButton:) forControlEvents:UIControlEventTouchUpInside];
-    if (@available(iOS 15.0, *))
-    {
-        UIButtonConfiguration *config = [UIButtonConfiguration tintedButtonConfiguration];
-        [config setTitleTextAttributesTransformer:^NSDictionary <NSAttributedStringKey, id> * _Nonnull(NSDictionary <NSAttributedStringKey, id> * _Nonnull textAttributes) {
-            NSMutableDictionary *newAttributes = [textAttributes mutableCopy];
-            [newAttributes setObject:[UIFont boldSystemFontOfSize:32.0] forKey:NSFontAttributeName];
-            return newAttributes;
-        }];
-        [config setCornerStyle:UIButtonConfigurationCornerStyleLarge];
-        [_mainButton setConfiguration:config];
-    }
-    else
-    {
-        [_mainButton.titleLabel setFont:[UIFont boldSystemFontOfSize:32.0]];
-    }
-    [self.backgroundView addSubview:_mainButton];
-
-    [_mainButton setTranslatesAutoresizingMaskIntoConstraints:NO];
-    [NSLayoutConstraint activateConstraints:@[
-        [_mainButton.centerXAnchor constraintEqualToAnchor:safeArea.centerXAnchor],
-        [_mainButton.centerYAnchor constraintEqualToAnchor:self.backgroundView.centerYAnchor],
-    ]];
-
+    // 5. 底部的高级设置按钮
     _settingsButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_settingsButton setTintColor:[UIColor whiteColor]];
-    [_settingsButton addTarget:self action:@selector(tapSettingsButton:) forControlEvents:UIControlEventTouchUpInside];
+    [_settingsButton setTitle:NSLocalizedString(@"Settings", @"高级设置") forState:UIControlStateNormal];
     [_settingsButton setImage:[UIImage systemImageNamed:@"gear"] forState:UIControlStateNormal];
-    [self.backgroundView addSubview:_settingsButton];
-    if (@available(iOS 15.0, *))
-    {
-        UIButtonConfiguration *config = [UIButtonConfiguration tintedButtonConfiguration];
-        [config setCornerStyle:UIButtonConfigurationCornerStyleLarge];
-        [_settingsButton setConfiguration:config];
-    }
+    [_settingsButton setBackgroundColor:[UIColor secondarySystemGroupedBackgroundColor]];
+    _settingsButton.layer.cornerRadius = 16.0;
+    _settingsButton.layer.cornerCurve = kCACornerCurveContinuous;
+    [_settingsButton setTintColor:[UIColor labelColor]];
+    [_settingsButton addTarget:self action:@selector(tapSettingsButton:) forControlEvents:UIControlEventTouchUpInside];
     [_settingsButton setTranslatesAutoresizingMaskIntoConstraints:NO];
-    [NSLayoutConstraint activateConstraints:@[
-        [_settingsButton.bottomAnchor constraintEqualToAnchor:safeArea.bottomAnchor constant:-20.0f],
-        [_settingsButton.centerXAnchor constraintEqualToAnchor:safeArea.centerXAnchor],
-        [_settingsButton.widthAnchor constraintEqualToConstant:40.0f],
-        [_settingsButton.heightAnchor constraintEqualToConstant:40.0f],
-    ]];
+    [self.backgroundView addSubview:_settingsButton];
 
+    // 6. 底部原作者致谢信息
     _authorLabel = [[UILabel alloc] init];
     [_authorLabel setNumberOfLines:0];
     [_authorLabel setTextAlignment:NSTextAlignmentCenter];
-    [_authorLabel setTextColor:[UIColor whiteColor]];
-    [_authorLabel setFont:[UIFont systemFontOfSize:14.0]];
+    [_authorLabel setTextColor:[UIColor secondaryLabelColor]];
+    [_authorLabel setFont:[UIFont systemFontOfSize:13.0]];
     [_authorLabel sizeToFit];
     [self.backgroundView addSubview:_authorLabel];
-
-    _authorLabelBottomConstraint = [_authorLabel.bottomAnchor constraintEqualToAnchor:safeArea.bottomAnchor constant:_gAuthorLabelBottomConstraintConstantRegular];
     [_authorLabel setTranslatesAutoresizingMaskIntoConstraints:NO];
-    [NSLayoutConstraint activateConstraints:@[
-        _authorLabelBottomConstraint,
-        [_authorLabel.centerXAnchor constraintEqualToAnchor:safeArea.centerXAnchor],
-    ]];
 
     UITapGestureRecognizer *authorTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapAuthorLabel:)];
     [_authorLabel setUserInteractionEnabled:YES];
     [_authorLabel addGestureRecognizer:authorTapGesture];
+
+    // 7. AutoLayout 精确约束
+    [NSLayoutConstraint activateConstraints:@[
+        [headerLabel.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:40.0f],
+        [headerLabel.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:24.0f],
+
+        [mainCard.topAnchor constraintEqualToAnchor:headerLabel.bottomAnchor constant:30.0f],
+        [mainCard.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:20.0f],
+        [mainCard.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-20.0f],
+        [mainCard.heightAnchor constraintEqualToConstant:120.0f],
+
+        [_mainButton.centerXAnchor constraintEqualToAnchor:mainCard.centerXAnchor],
+        [_mainButton.centerYAnchor constraintEqualToAnchor:mainCard.centerYAnchor],
+        [_mainButton.widthAnchor constraintEqualToAnchor:mainCard.widthAnchor constant:-40.0f],
+        [_mainButton.heightAnchor constraintEqualToConstant:60.0f],
+
+        [positionCard.topAnchor constraintEqualToAnchor:mainCard.bottomAnchor constant:20.0f],
+        [positionCard.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:20.0f],
+        [positionCard.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-20.0f],
+        [positionCard.heightAnchor constraintEqualToConstant:80.0f],
+
+        [_topCenterButton.centerXAnchor constraintEqualToAnchor:positionCard.centerXAnchor],
+        [_topCenterButton.centerYAnchor constraintEqualToAnchor:positionCard.centerYAnchor],
+        [_topCenterButton.widthAnchor constraintEqualToConstant:60.0f],
+        [_topCenterButton.heightAnchor constraintEqualToConstant:60.0f],
+
+        [_topLeftButton.centerYAnchor constraintEqualToAnchor:positionCard.centerYAnchor],
+        [_topLeftButton.trailingAnchor constraintEqualToAnchor:_topCenterButton.leadingAnchor constant:-20.0f],
+        [_topLeftButton.widthAnchor constraintEqualToConstant:60.0f],
+        [_topLeftButton.heightAnchor constraintEqualToConstant:60.0f],
+
+        [_topRightButton.centerYAnchor constraintEqualToAnchor:positionCard.centerYAnchor],
+        [_topRightButton.leadingAnchor constraintEqualToAnchor:_topCenterButton.trailingAnchor constant:20.0f],
+        [_topRightButton.widthAnchor constraintEqualToConstant:60.0f],
+        [_topRightButton.heightAnchor constraintEqualToConstant:60.0f],
+
+        [_settingsButton.topAnchor constraintEqualToAnchor:positionCard.bottomAnchor constant:20.0f],
+        [_settingsButton.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:20.0f],
+        [_settingsButton.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-20.0f],
+        [_settingsButton.heightAnchor constraintEqualToConstant:60.0f],
+
+        [_authorLabel.bottomAnchor constraintEqualToAnchor:safeArea.bottomAnchor constant:-20.0f],
+        [_authorLabel.centerXAnchor constraintEqualToAnchor:safeArea.centerXAnchor],
+    ]];
 
     [self verticalSizeClassUpdated];
     [self reloadMainButtonState];
@@ -252,6 +253,9 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
     [self toggleHUDAfterLaunch];
 }
 
+// ==========================================
+// 核心逻辑保留区：系统交互与悬浮窗功能
+// ==========================================
 - (void)toggleHUDNotificationReceived:(NSNotification *)notification {
     NSString *toggleAction = notification.userInfo[kToggleHUDAfterLaunchNotificationActionKey];
     if (!toggleAction) {
@@ -528,8 +532,8 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSDictionary *defaultAttributes = @{
-            NSForegroundColorAttributeName: [UIColor whiteColor],
-            NSFontAttributeName: [UIFont systemFontOfSize:14],
+            NSForegroundColorAttributeName: [UIColor secondaryLabelColor], // 适配新 UI 的颜色
+            NSFontAttributeName: [UIFont systemFontOfSize:13],
         };
 
         NSMutableParagraphStyle *creditsParaStyle = [[NSMutableParagraphStyle alloc] init];
@@ -537,8 +541,8 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
         creditsParaStyle.alignment = NSTextAlignmentCenter;
 
         NSDictionary *creditsAttributes = @{
-            NSForegroundColorAttributeName: [UIColor whiteColor],
-            NSFontAttributeName: [UIFont systemFontOfSize:14],
+            NSForegroundColorAttributeName: [UIColor secondaryLabelColor], // 适配新 UI 的颜色
+            NSFontAttributeName: [UIFont systemFontOfSize:13],
             NSParagraphStyleAttributeName: creditsParaStyle,
         };
 
@@ -553,13 +557,13 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
 
         NSAttributedString *githubIconText = [NSAttributedString attributedStringWithAttachment:githubIcon];
         NSMutableAttributedString *githubIconTextFull = [[NSMutableAttributedString alloc] initWithAttributedString:githubIconText];
-        [githubIconTextFull appendAttributedString:[[NSAttributedString alloc] initWithString:@" " attributes:creditsAttributes]];
+        [githubIconTextFull appendAttributedString:[[NSAttributedString alloc] initWithString:@" " attributes:creditsAttributes]];
 
         NSAttributedString *i18nIconText = [NSAttributedString attributedStringWithAttachment:i18nIcon];
         NSMutableAttributedString *i18nIconTextFull = [[NSMutableAttributedString alloc] initWithAttributedString:i18nIconText];
-        [i18nIconTextFull appendAttributedString:[[NSAttributedString alloc] initWithString:@" " attributes:creditsAttributes]];
+        [i18nIconTextFull appendAttributedString:[[NSAttributedString alloc] initWithString:@" " attributes:creditsAttributes]];
 
-        NSString *creditsText = NSLocalizedString(@"Made with ♥ by @GITHUB@Lessica and @GITHUB@jmpews\nTranslation @TRANSLATION@", nil);
+        NSString *creditsText = NSLocalizedString(@"Made with ♥ by @GITHUB@Lessica and @GITHUB@jmpews\nTranslation @TRANSLATION@", nil);
         NSMutableAttributedString *creditsAttributedText = [[NSMutableAttributedString alloc] initWithString:creditsText attributes:creditsAttributes];
 
         // replace all "@GITHUB@" with github icon
@@ -727,24 +731,14 @@ static const CGFloat _gAuthorLabelBottomConstraintConstantRegular = -80.f;
     [self presentViewController:settingsViewController animated:YES completion:nil];
 }
 
+// 替换后的精简版旋转适配逻辑
 - (void)verticalSizeClassUpdated
 {
     UIUserInterfaceSizeClass verticalClass = self.traitCollection.verticalSizeClass;
-    BOOL isPad = ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad);
     if (verticalClass == UIUserInterfaceSizeClassCompact) {
-        CGFloat topConstant = _gTopButtonConstraintsConstantCompact;
         [_settingsButton setHidden:YES];
-        [_authorLabelBottomConstraint setConstant:_gAuthorLabelBottomConstraintConstantCompact];
-        [_topLeftConstraint setConstant:topConstant];
-        [_topRightConstraint setConstant:topConstant];
-        [_topCenterConstraint setConstant:topConstant];
     } else {
-        CGFloat topConstant = isPad ? _gTopButtonConstraintsConstantRegularPad : _gTopButtonConstraintsConstantRegular;
         [_settingsButton setHidden:NO];
-        [_authorLabelBottomConstraint setConstant:_gAuthorLabelBottomConstraintConstantRegular];
-        [_topLeftConstraint setConstant:topConstant];
-        [_topRightConstraint setConstant:topConstant];
-        [_topCenterConstraint setConstant:topConstant];
     }
 }
 
