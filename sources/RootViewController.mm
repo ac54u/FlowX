@@ -3,7 +3,7 @@
 //  TrollSpeed
 //
 //  Refactored with Modern Fixed Grid UI (Control Center Aesthetic)
-//  Fixed System Gesture Interception Bug
+//  Fixed System Gesture Interception & Delegate Implementation Bugs
 //
 
 #import <notify.h>
@@ -412,6 +412,11 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [sender setOn:newState animated:YES];
 }
 
+// 补充的方法：满足旧的通知机制依赖
+- (void)reloadMainButtonState {
+    [self reloadAllStatesAnimated:YES];
+}
+
 - (void)reloadAllStatesAnimated:(BOOL)animated {
     _isRemoteHUDActive = [self isHUDEnabled];
     [_mainCard setOn:_isRemoteHUDActive animated:animated];
@@ -449,8 +454,24 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     }
     
     // 作者标签
-    NSString *credits = @"Made with ♥ by Lessica & jmpews\nDesign Reimagined";
+    NSString *credits = @"Made with ♥ by Lessica & jmpews\nDesign Reimagined by AI";
     _authorLabel.text = credits;
+}
+
+// ==========================================
+// 补全 TSSettingsControllerDelegate 遗留方法
+// ==========================================
+- (BOOL)settingHighlightedWithKey:(NSString * _Nonnull)key {
+    [self loadUserDefaults:NO];
+    NSNumber *mode = [_userDefaults objectForKey:key];
+    return mode != nil ? [mode boolValue] : NO;
+}
+
+- (void)settingDidSelectWithKey:(NSString * _Nonnull)key {
+    BOOL highlighted = [self settingHighlightedWithKey:key];
+    [_userDefaults setObject:@(!highlighted) forKey:key];
+    [self saveUserDefaults];
+    [self reloadAllStatesAnimated:YES];
 }
 
 // ==========================================
@@ -466,7 +487,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 - (void)toggleHUDAfterLaunch {
     if ([RootViewController shouldToggleHUDAfterLaunch]) {
         [RootViewController setShouldToggleHUDAfterLaunch:NO];
-        [self mainSwitchToggled];
+        if (!_isRemoteHUDActive) [self mainSwitchToggled];
         [[UIApplication sharedApplication] suspend];
     }
 }
@@ -509,6 +530,11 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         [alert addAction:[UIAlertAction actionWithTitle:@"重置所有设置" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
             [self resetUserDefaults];
         }]];
+#if DEBUG && !TARGET_OS_SIMULATOR
+        [alertController addAction:[UIAlertAction actionWithTitle:@"内存压力测试" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+            SimulateMemoryPressure();
+        }]];
+#endif
         [self presentViewController:alert animated:YES completion:nil];
     }
 }
