@@ -1,6 +1,8 @@
 //
 //  RootViewController.mm
-//  TrollSpeed - Final Compiler-Safe Edition
+//  TrollSpeed - Final Clean Edition
+//
+//  修复：彻底清除废弃的滑动条变量，修复编译报错。
 //
 
 #import <notify.h>
@@ -15,6 +17,9 @@
 
 #define HUD_TRANSITION_DURATION 0.25
 
+// ==========================================
+// 组件 1：现代磁贴按钮
+// ==========================================
 @interface TSTileButton : UIControl
 @property (nonatomic, strong) UIImageView *iconView;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -63,15 +68,18 @@
 - (void)touchUp { [UIView animateWithDuration:0.15 animations:^{ self.transform = CGAffineTransformIdentity; }]; }
 - (void)setOn:(BOOL)on animated:(BOOL)animated {
     _isOn = on;
+    __weak typeof(self) weakSelf = self;
     void (^updateBlock)(void) = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
         if (on) {
-            self.backgroundColor = [UIColor systemBlueColor];
-            self.iconView.tintColor = [UIColor whiteColor];
-            self.titleLabel.textColor = [UIColor whiteColor];
+            strongSelf.backgroundColor = [UIColor systemBlueColor];
+            strongSelf.iconView.tintColor = [UIColor whiteColor];
+            strongSelf.titleLabel.textColor = [UIColor whiteColor];
         } else {
-            self.backgroundColor = [UIColor secondarySystemFillColor];
-            self.iconView.tintColor = [UIColor labelColor];
-            self.titleLabel.textColor = [UIColor secondaryLabelColor];
+            strongSelf.backgroundColor = [UIColor secondarySystemFillColor];
+            strongSelf.iconView.tintColor = [UIColor labelColor];
+            strongSelf.titleLabel.textColor = [UIColor secondaryLabelColor];
         }
     };
     if (animated) [UIView transitionWithView:self duration:0.2 options:UIViewAnimationOptionTransitionCrossDissolve animations:updateBlock completion:nil];
@@ -79,6 +87,9 @@
 }
 @end
 
+// ==========================================
+// 组件 2：主状态大卡片
+// ==========================================
 @interface TSMainCard : UIControl
 @property (nonatomic, strong) UIImageView *iconView;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -138,25 +149,28 @@
 - (void)touchUp { [UIView animateWithDuration:0.15 animations:^{ self.transform = CGAffineTransformIdentity; }]; }
 - (void)setOn:(BOOL)on animated:(BOOL)animated {
     _isOn = on;
+    __weak typeof(self) weakSelf = self;
     void (^updateBlock)(void) = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
         if (on) {
-            self.backgroundColor = [UIColor systemGreenColor];
-            self.iconView.image = [UIImage systemImageNamed:@"speedometer"];
-            self.iconView.tintColor = [UIColor whiteColor];
-            self.titleLabel.text = @"监控运行中";
-            self.titleLabel.textColor = [UIColor whiteColor];
-            self.subtitleLabel.text = @"您可以在屏幕上自由拖动悬浮窗";
-            self.subtitleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.8];
-            self.trafficLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.9];
+            strongSelf.backgroundColor = [UIColor systemGreenColor];
+            strongSelf.iconView.image = [UIImage systemImageNamed:@"speedometer"];
+            strongSelf.iconView.tintColor = [UIColor whiteColor];
+            strongSelf.titleLabel.text = @"监控运行中";
+            strongSelf.titleLabel.textColor = [UIColor whiteColor];
+            strongSelf.subtitleLabel.text = @"您可以在屏幕上自由拖动悬浮窗";
+            strongSelf.subtitleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.8];
+            strongSelf.trafficLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.9];
         } else {
-            self.backgroundColor = [UIColor secondarySystemFillColor];
-            self.iconView.image = [UIImage systemImageNamed:@"speedometer"];
-            self.iconView.tintColor = [UIColor systemGrayColor];
-            self.titleLabel.text = @"悬浮窗已关闭";
-            self.titleLabel.textColor = [UIColor labelColor];
-            self.subtitleLabel.text = @"点击卡片启动服务";
-            self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
-            self.trafficLabel.textColor = [UIColor systemGrayColor];
+            strongSelf.backgroundColor = [UIColor secondarySystemFillColor];
+            strongSelf.iconView.image = [UIImage systemImageNamed:@"speedometer"];
+            strongSelf.iconView.tintColor = [UIColor systemGrayColor];
+            strongSelf.titleLabel.text = @"悬浮窗已关闭";
+            strongSelf.titleLabel.textColor = [UIColor labelColor];
+            strongSelf.subtitleLabel.text = @"点击卡片启动服务";
+            strongSelf.subtitleLabel.textColor = [UIColor secondaryLabelColor];
+            strongSelf.trafficLabel.textColor = [UIColor systemGrayColor];
         }
     };
     if (animated) [UIView transitionWithView:self duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:updateBlock completion:nil];
@@ -164,6 +178,9 @@
 }
 @end
 
+// ==========================================
+// RootViewController 主类实现
+// ==========================================
 @implementation RootViewController {
     NSMutableDictionary *_userDefaults;
     BOOL _isRemoteHUDActive;
@@ -172,6 +189,8 @@
     NSArray<TSTileButton *> *_settingButtons;
     UIImpactFeedbackGenerator *_impactFeedbackGenerator;
 }
+
+static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
 + (void)setShouldToggleHUDAfterLaunch:(BOOL)flag { _gShouldToggleHUDAfterLaunch = flag; }
 + (BOOL)shouldToggleHUDAfterLaunch { return _gShouldToggleHUDAfterLaunch; }
@@ -313,15 +332,10 @@
 - (void)mainSwitchToggled {
     [_impactFeedbackGenerator prepare];
     [_impactFeedbackGenerator impactOccurred];
-    [self toggleMainHUDState];
-}
-
-- (void)toggleMainHUDState {
     BOOL isNowEnabled = [self isHUDEnabled];
     [self setHUDEnabled:!isNowEnabled];
-    isNowEnabled = !isNowEnabled;
-
-    if (isNowEnabled) {
+    
+    if (!isNowEnabled) {
         dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
         int anyToken;
         notify_register_dispatch(NOTIFY_LAUNCHED_HUD, &anyToken, dispatch_get_main_queue(), ^(int token) {
@@ -359,7 +373,7 @@
 - (void)settingToggled:(TSTileButton *)sender {
     [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
     
-    if (sender.tag == 111) { // 复位
+    if (sender.tag == 111) { // 复位拖拽坐标
         [self loadUserDefaults:NO];
         [_userDefaults setObject:@(NO) forKey:@"HUDUserDefaultsKeyUsesCustomOffset"];
         [_userDefaults setObject:@(0) forKey:@"HUDUserDefaultsKeyRealCustomOffsetX"];
@@ -418,20 +432,8 @@
 }
 
 // ==========================================
-// 兼容协议方法的“空壳”实现 (防报错核心)
+// 协议要求方法实现
 // ==========================================
-#pragma mark - Dummy TableView Delegates
-- (NSInteger)numberOfSectionsInTableView:(id)tableView { return 0; }
-- (NSInteger)tableView:(id)tableView numberOfRowsInSection:(NSInteger)section { return 0; }
-- (id)tableView:(id)tableView titleForHeaderInSection:(NSInteger)section { return nil; }
-- (id)tableView:(id)tableView cellForRowAtIndexPath:(id)indexPath { return nil; }
-- (void)tableView:(id)tableView didSelectRowAtIndexPath:(id)indexPath {}
-
-#pragma mark - Legacy Method Stubs
-- (void)reloadModeButtonState { [self reloadAllStatesAnimated:YES]; }
-- (void)presentTopCenterMostHints {}
-- (void)verticalSizeClassUpdated {}
-- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {}
 - (void)reloadMainButtonState { [self reloadAllStatesAnimated:YES]; }
 - (BOOL)settingHighlightedWithKey:(NSString *)key { [self loadUserDefaults:NO]; NSNumber *mode = [_userDefaults objectForKey:key]; return mode != nil ? [mode boolValue] : NO; }
 - (void)settingDidSelectWithKey:(NSString *)key { BOOL highlighted = [self settingHighlightedWithKey:key]; [_userDefaults setObject:@(!highlighted) forKey:key]; [self saveUserDefaults]; [self reloadAllStatesAnimated:YES]; }
@@ -440,10 +442,9 @@
 - (void)toggleOnHUDAfterLaunch { if ([RootViewController shouldToggleHUDAfterLaunch]) { [RootViewController setShouldToggleHUDAfterLaunch:NO]; if (!_isRemoteHUDActive) [self mainSwitchToggled]; [[UIApplication sharedApplication] suspend]; } }
 - (void)toggleOffHUDAfterLaunch { if ([RootViewController shouldToggleHUDAfterLaunch]) { [RootViewController setShouldToggleHUDAfterLaunch:NO]; if (_isRemoteHUDActive) [self mainSwitchToggled]; [[UIApplication sharedApplication] suspend]; } }
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator { [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator]; [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext>  _Nonnull context) { [self reloadAllStatesAnimated:NO]; } completion:nil]; }
-- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event { if (motion == UIEventSubtypeMotionShake) { UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"开发者选项" message:@"请选择操作" preferredStyle:UIAlertControllerStyleAlert]; [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]]; [alert addAction:[UIAlertAction actionWithTitle:@"重置所有设置" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) { NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier]; if (bundleIdentifier) { [GetStandardUserDefaults() removePersistentDomainForName:bundleIdentifier]; [GetStandardUserDefaults() synchronize]; } if ([[NSFileManager defaultManager] removeItemAtPath:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) error:nil]) { [self setHUDEnabled:NO]; [[UIApplication sharedApplication] terminateWithSuccess]; } }]]; [self presentViewController:alert animated:YES completion:nil]; } }
 
 // ==========================================
-// 属性持久化逻辑
+// 数据与属性持久化
 // ==========================================
 - (void)loadUserDefaults:(BOOL)forceReload { if (forceReload || !_userDefaults) { _userDefaults = [[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] mutableCopy] ?: [NSMutableDictionary dictionary]; } }
 - (void)saveUserDefaults { [_userDefaults writeToFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) atomically:YES]; notify_post(NOTIFY_RELOAD_HUD); }
@@ -473,8 +474,5 @@
 - (void)setDisplayMode:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyDisplayMode]; [self saveUserDefaults]; }
 - (BOOL)usesDualColor { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:@"HUD_USES_DUAL_COLOR"]; return m != nil ? [m boolValue] : YES; }
 - (void)setUsesDualColor:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:@"HUD_USES_DUAL_COLOR"]; [self saveUserDefaults]; }
-- (BOOL)usesCustomOffset { return [[NSUserDefaults standardUserDefaults] boolForKey:@"HUDUserDefaultsKeyUsesCustomOffset"]; }
-- (CGFloat)realCustomOffsetX { return [[NSUserDefaults standardUserDefaults] doubleForKey:@"HUDUserDefaultsKeyRealCustomOffsetX"]; }
-- (CGFloat)realCustomOffsetY { return [[NSUserDefaults standardUserDefaults] doubleForKey:@"HUDUserDefaultsKeyRealCustomOffsetY"]; }
-- (void)tapAuthorLabel:(UITapGestureRecognizer *)s { if (_isRemoteHUDActive) return; [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://trollspeed.app"] options:@{} completionHandler:nil]; }
+
 @end
