@@ -294,65 +294,47 @@ static NSAttributedString *formattedFPSAttributedString(BOOL isFocused) {
             return;
         }
 
-        uint64_t upDiff = 0, downDiff = 0;
-        if (_isFocused) {
-            upDiff = now.outputBytes;
-            downDiff = now.inputBytes;
-        } else {
-            if (now.outputBytes > lastOut) upDiff = now.outputBytes - lastOut;
-            if (now.inputBytes > lastIn) downDiff = now.inputBytes - lastIn;
-        }
-
+        // 1. 真实差值：只用于底层流量累计，绝不被 _isFocused 干扰
+        uint64_t realUpDiff = (now.outputBytes >= lastOut) ? now.outputBytes - lastOut : 0;
+        uint64_t realDownDiff = (now.inputBytes >= lastIn) ? now.inputBytes - lastIn : 0;
+        
         lastIn = now.inputBytes;
         lastOut = now.outputBytes;
 
-        [self trackTraffic:upDiff + downDiff];
+        [self trackTraffic:realUpDiff + realDownDiff];
+
+        // 2. 显示差值：如果点击了悬浮窗，就显示历史总流量，否则显示实时网速
+        uint64_t displayUp = _isFocused ? now.outputBytes : realUpDiff;
+        uint64_t displayDown = _isFocused ? now.inputBytes : realDownDiff;
 
         if (HUD_DISPLAY_MODE == 1) {
             [_speedLabel setAttributedText:formattedFPSAttributedString(_isFocused)];
         } else {
             UIColor *uCol = HUD_USES_DUAL_COLOR ? [UIColor systemOrangeColor] : [UIColor whiteColor];
             UIColor *dCol = HUD_USES_DUAL_COLOR ? [UIColor systemTealColor] : [UIColor whiteColor];
-            if (HUD_FONT_WEIGHT == UIFontWeightMedium) {
-                uCol = [UIColor clearColor];
-                dCol = [UIColor clearColor];
-            }
+            if (HUD_FONT_WEIGHT == UIFontWeightMedium) { uCol = [UIColor clearColor]; dCol = [UIColor clearColor]; }
 
-            NSMutableAttributedString *mutableString = [[NSMutableAttributedString alloc] init];
-            NSAttributedString *attributedInlineSeparator = [[NSAttributedString alloc] initWithString:[NSString stringWithUTF8String:INLINE_SEPARATOR] attributes:@{ NSFontAttributeName: [UIFont boldSystemFontOfSize:HUD_FONT_SIZE] }];
-            NSAttributedString *attributedLineSeparator = [[NSAttributedString alloc] initWithString:@"\n" attributes:@{ NSFontAttributeName: [UIFont boldSystemFontOfSize:HUD_FONT_SIZE] }];
-
-            if (HUD_DATA_UNIT == 1) {
-                upDiff *= 8;
-                downDiff *= 8;
-            }
+            NSMutableAttributedString *ms = [NSMutableAttributedString new];
+            NSAttributedString *sep = [[NSAttributedString alloc] initWithString:HUD_SHOW_SECOND_SPEED_IN_NEW_LINE ? @"\n" : @"  "];
             
-            NSString *upStrRaw = [NSString stringWithFormat:@"%s %@", HUD_UPLOAD_PREFIX, formattedSpeed(upDiff, _isFocused)];
-            NSString *dnStrRaw = [NSString stringWithFormat:@"%s %@", HUD_DOWNLOAD_PREFIX, formattedSpeed(downDiff, _isFocused)];
+            // 【核心修复】：使用 stringWithUTF8String 正确解析 C 语言的箭头符号，拒绝乱码
+            NSString *upPrefix = [NSString stringWithUTF8String:HUD_UPLOAD_PREFIX];
+            NSString *dnPrefix = [NSString stringWithUTF8String:HUD_DOWNLOAD_PREFIX];
             
-            NSAttributedString *upStr = [[NSAttributedString alloc] initWithString:upStrRaw attributes:@{NSFontAttributeName: [UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName: uCol}];
-            NSAttributedString *dnStr = [[NSAttributedString alloc] initWithString:dnStrRaw attributes:@{NSFontAttributeName: [UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName: dCol}];
+            NSString *upStrRaw = [NSString stringWithFormat:@"%@ %@", upPrefix, formattedSpeed(displayUp, _isFocused)];
+            NSString *dnStrRaw = [NSString stringWithFormat:@"%@ %@", dnPrefix, formattedSpeed(displayDown, _isFocused)];
+            
+            NSAttributedString *upS = [[NSAttributedString alloc] initWithString:upStrRaw attributes:@{NSFontAttributeName:[UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName:uCol}];
+            NSAttributedString *dnS = [[NSAttributedString alloc] initWithString:dnStrRaw attributes:@{NSFontAttributeName:[UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName:dCol}];
 
             if (HUD_SHOW_DOWNLOAD_SPEED_FIRST) {
-                if (HUD_SHOW_DOWNLOAD_SPEED) [mutableString appendAttributedString:dnStr];
-                if (HUD_SHOW_UPLOAD_SPEED) {
-                    if ([mutableString length] > 0) {
-                        if (HUD_SHOW_SECOND_SPEED_IN_NEW_LINE) [mutableString appendAttributedString:attributedLineSeparator];
-                        else [mutableString appendAttributedString:attributedInlineSeparator];
-                    }
-                    [mutableString appendAttributedString:upStr];
-                }
+                if (HUD_SHOW_DOWNLOAD_SPEED) [ms appendAttributedString:dnS];
+                if (HUD_SHOW_UPLOAD_SPEED) { if (ms.length) [ms appendAttributedString:sep]; [ms appendAttributedString:upS]; }
             } else {
-                if (HUD_SHOW_UPLOAD_SPEED) [mutableString appendAttributedString:upStr];
-                if (HUD_SHOW_DOWNLOAD_SPEED) {
-                    if ([mutableString length] > 0) {
-                        if (HUD_SHOW_SECOND_SPEED_IN_NEW_LINE) [mutableString appendAttributedString:attributedLineSeparator];
-                        else [mutableString appendAttributedString:attributedInlineSeparator];
-                    }
-                    [mutableString appendAttributedString:dnStr];
-                }
+                if (HUD_SHOW_UPLOAD_SPEED) [ms appendAttributedString:upS];
+                if (HUD_SHOW_DOWNLOAD_SPEED) { if (ms.length) [ms appendAttributedString:sep]; [ms appendAttributedString:dnS]; }
             }
-            [_speedLabel setAttributedText:mutableString];
+            [_speedLabel setAttributedText:ms];
         }
         [_speedLabel sizeToFit];
     }

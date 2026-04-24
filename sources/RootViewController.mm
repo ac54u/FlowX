@@ -215,7 +215,8 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 - (void)updateTrafficUI {
-    [self loadUserDefaults:NO];
+    // 必须强制传 YES 刷新磁盘，否则永远读的是内存里的 0 KB！
+    [self loadUserDefaults:YES];
     NSString *today = [NSDateFormatter localizedStringFromDate:[NSDate date] dateStyle:NSDateFormatterShortStyle timeStyle:NSDateFormatterNoStyle];
     NSString *savedDay = [_userDefaults objectForKey:@"kDailyTrafficDate"];
     
