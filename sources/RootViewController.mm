@@ -2,7 +2,7 @@
 //  RootViewController.mm
 //  TrollSpeed
 //
-//  Refactored with Pure Native Inset Grouped UI (All Options Integrated)
+//  Refactored with Pure Native Inset Grouped UI (Apple-Grade Design & Bug Fixes)
 //
 
 #import <notify.h>
@@ -63,6 +63,20 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(toggleHUDNotificationReceived:) name:kToggleHUDAfterLaunchNotificationName object:nil];
 }
 
+// ==========================================
+// 修复 iOS 边缘手势 (下拉控制中心) 被拦截的问题
+// ==========================================
+- (BOOL)prefersStatusBarHidden {
+    return NO;
+}
+
+- (UIRectEdge)preferredScreenEdgesDeferringSystemGestures {
+    return UIRectEdgeNone;
+}
+
+// ==========================================
+// 大厂级 UI 重构
+// ==========================================
 - (void)loadView
 {
     CGRect bounds = UIScreen.mainScreen.bounds;
@@ -75,13 +89,21 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     self.tableView.dataSource = self;
     [self.view addSubview:self.tableView];
 
-    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 80)];
-    UILabel *headerLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 20, bounds.size.width - 40, 40)];
+    // 带有图标的 Hero Header
+    UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 100)];
+    
+    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(20, 30, 36, 36)];
+    iconView.image = [UIImage systemImageNamed:@"bolt.shield.fill"];
+    iconView.tintColor = [UIColor systemBlueColor];
+    iconView.contentMode = UIViewContentModeScaleAspectFit;
+    [headerView addSubview:iconView];
+    
+    UILabel *headerLabel = [[UILabel alloc] initWithFrame:CGRectMake(66, 28, bounds.size.width - 80, 40)];
     headerLabel.text = @"TrollSpeed";
     headerLabel.font = [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
     headerLabel.textColor = [UIColor labelColor];
-    headerLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin;
     [headerView addSubview:headerLabel];
+    
     self.tableView.tableHeaderView = headerView;
 
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 100)];
@@ -120,23 +142,30 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 // ==========================================
-// UITableView DataSource & Delegate
+// UITableView 逻辑：更清晰的模块化分组
 // ==========================================
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3; 
+    return 4; // 分为：状态、位置、外观样式、高级行为
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 1; 
-    if (section == 1) return 3; 
-    if (section == 2) return 10; // 10 个高级选项
+    if (section == 0) return 1; // 状态
+    if (section == 1) return 3; // 位置
+    if (section == 2) return 5; // 外观
+    if (section == 3) return 3; // 行为
     return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"运行状态";
+    if (section == 0) return @"核心功能";
     if (section == 1) return @"显示位置";
-    if (section == 2) return @"高级设置";
+    if (section == 2) return @"外观与样式";
+    if (section == 3) return @"高级控制";
+    return nil;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == 3) return @"穿透模式下，悬浮窗将无视所有触摸操作，不会影响您点击后方的应用。";
     return nil;
 }
 
@@ -144,7 +173,8 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     static NSString *CellId = @"Cell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:CellId];
     if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:CellId];
+        // 使用 Subtitle 样式支持两行文字
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:CellId];
     }
 
     cell.accessoryType = UITableViewCellAccessoryNone;
@@ -152,38 +182,40 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 
     if (indexPath.section == 0) {
-        NSString *title = _isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
+        // 1. 运行状态
+        NSString *title = _isRemoteHUDActive ? @"实时网速监控" : @"悬浮窗已关闭";
+        NSString *subTitle = _isRemoteHUDActive ? @"服务运行中，可退至桌面" : @"点击右侧开关以启动服务";
+        
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
             config.text = title;
+            config.secondaryText = subTitle;
             config.image = [UIImage systemImageNamed:@"speedometer"];
-            config.imageProperties.tintColor = [UIColor systemBlueColor];
+            config.imageProperties.tintColor = _isRemoteHUDActive ? [UIColor systemGreenColor] : [UIColor systemGrayColor];
             cell.contentConfiguration = config;
-        } else {
-            cell.textLabel.text = title;
-            cell.imageView.image = [UIImage systemImageNamed:@"speedometer"];
         }
         [_mainSwitch setOn:_isRemoteHUDActive animated:NO];
         cell.accessoryView = _mainSwitch;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
     else if (indexPath.section == 1) {
+        // 2. 位置控制
         HUDPresetPosition selectedMode = [self selectedModeForCurrentOrientation];
         NSString *title = @"";
         NSString *iconName = @"";
         BOOL isSelected = NO;
 
         if (indexPath.row == 0) {
-            title = @"左上角";
+            title = @"屏幕左上角";
             iconName = @"arrow.up.left";
             isSelected = (selectedMode == HUDPresetPositionTopLeft);
         } else if (indexPath.row == 1) {
             BOOL isCenteredMost = (selectedMode == HUDPresetPositionTopCenterMost);
-            title = isCenteredMost ? @"顶部居中 (灵动岛)" : @"顶部居中";
-            iconName = isCenteredMost ? @"arrow.up.to.line" : @"arrow.up";
+            title = isCenteredMost ? @"顶部居中 (融合灵动岛)" : @"顶部刘海下方";
+            iconName = isCenteredMost ? @"capsule.portrait" : @"iphone.notch";
             isSelected = (selectedMode == HUDPresetPositionTopCenter || selectedMode == HUDPresetPositionTopCenterMost);
         } else if (indexPath.row == 2) {
-            title = @"右上角";
+            title = @"屏幕右上角";
             iconName = @"arrow.up.right";
             isSelected = (selectedMode == HUDPresetPositionTopRight);
         }
@@ -193,50 +225,88 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             config.text = title;
             config.image = [UIImage systemImageNamed:iconName];
             cell.contentConfiguration = config;
-        } else {
-            cell.textLabel.text = title;
-            cell.imageView.image = [UIImage systemImageNamed:iconName];
         }
         cell.accessoryType = isSelected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     }
     else if (indexPath.section == 2) {
-        // ==========================================
-        // 集成所有底部的 10 个高级设置选项
-        // ==========================================
-        UISwitch *optionSwitch = [[UISwitch alloc] init];
-        optionSwitch.tag = indexPath.row;
-        [optionSwitch addTarget:self action:@selector(advancedOptionToggled:) forControlEvents:UIControlEventValueChanged];
-        cell.accessoryView = optionSwitch;
+        // 3. 外观与样式 (5项)
+        UISwitch *optSwitch = [[UISwitch alloc] init];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-
+        
         NSString *title = @"";
-        NSString *iconName = @"";
+        NSString *sub = @"";
+        NSString *icon = @"";
         BOOL isOn = NO;
 
-        switch (indexPath.row) {
-            case 0: title = @"穿透模式"; iconName = @"cursorarrow.rays"; isOn = [self passthroughMode]; break;
-            case 1: title = @"单行模式"; iconName = @"text.alignleft"; isOn = [self singleLineMode]; break;
-            case 2: title = @"显示网速单位"; iconName = @"chart.bar"; isOn = [self usesBitrate]; break;
-            case 3: title = @"箭头指示"; iconName = @"arrow.up.arrow.down"; isOn = [self usesArrowPrefixes]; break;
-            case 4: title = @"大字体"; iconName = @"textformat.size"; isOn = [self usesLargeFont]; break;
-            case 5: title = @"使用屏幕旋转"; iconName = @"crop.rotate"; isOn = [self usesRotation]; break;
-            case 6: title = @"反转颜色"; iconName = @"circle.lefthalf.filled"; isOn = [self usesInvertedColor]; break;
-            case 7: title = @"原位保持"; iconName = @"lock"; isOn = [self keepInPlace]; break;
-            case 8: title = @"截图时隐藏"; iconName = @"camera.viewfinder"; isOn = [self hideAtSnapshot]; break;
-            case 9: title = @"显示模式"; iconName = @"eye"; isOn = [self displayMode]; break;
+        if (indexPath.row == 0) {
+            title = @"单行模式"; sub = @"将上下两行压缩为单行显示"; icon = @"text.alignleft";
+            isOn = [self singleLineMode];
+            optSwitch.tag = 101;
+        } else if (indexPath.row == 1) {
+            title = @"大字体显示"; sub = @"增加网速数字的字号"; icon = @"textformat.size";
+            isOn = [self usesLargeFont];
+            optSwitch.tag = 104;
+        } else if (indexPath.row == 2) {
+            title = @"反转文本颜色"; sub = @"在浅色背景下使用黑字显示"; icon = @"circle.lefthalf.filled";
+            isOn = [self usesInvertedColor];
+            optSwitch.tag = 106;
+        } else if (indexPath.row == 3) {
+            title = @"显示箭头指示"; sub = @"显示上下行箭头的图标"; icon = @"arrow.up.arrow.down";
+            isOn = [self usesArrowPrefixes];
+            optSwitch.tag = 103;
+        } else if (indexPath.row == 4) {
+            title = @"显示网速单位"; sub = @"如 KB/s, MB/s"; icon = @"chart.bar";
+            isOn = [self usesBitrate];
+            optSwitch.tag = 102;
         }
 
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
             config.text = title;
-            config.image = [UIImage systemImageNamed:iconName];
+            config.secondaryText = sub;
+            config.image = [UIImage systemImageNamed:icon];
             config.imageProperties.tintColor = [UIColor systemGrayColor];
             cell.contentConfiguration = config;
-        } else {
-            cell.textLabel.text = title;
-            cell.imageView.image = [UIImage systemImageNamed:iconName];
         }
-        [optionSwitch setOn:isOn animated:NO];
+        [optSwitch setOn:isOn animated:NO];
+        [optSwitch addTarget:self action:@selector(advancedOptionToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = optSwitch;
+    }
+    else if (indexPath.section == 3) {
+        // 4. 高级行为控制 (3项)
+        UISwitch *optSwitch = [[UISwitch alloc] init];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        
+        NSString *title = @"";
+        NSString *sub = @"";
+        NSString *icon = @"";
+        BOOL isOn = NO;
+
+        if (indexPath.row == 0) {
+            title = @"触摸穿透模式"; sub = @"无视所有针对悬浮窗的点击"; icon = @"cursorarrow.rays";
+            isOn = [self passthroughMode];
+            optSwitch.tag = 100;
+        } else if (indexPath.row == 1) {
+            title = @"原位保持"; sub = @"忽略屏幕旋转，固定显示方向"; icon = @"lock.rotation";
+            isOn = [self keepInPlace];
+            optSwitch.tag = 107;
+        } else if (indexPath.row == 2) {
+            title = @"截图时隐藏"; sub = @"系统截屏时自动隐身"; icon = @"camera.viewfinder";
+            isOn = [self hideAtSnapshot];
+            optSwitch.tag = 108;
+        }
+
+        if (@available(iOS 14.0, *)) {
+            UIListContentConfiguration *config = [cell defaultContentConfiguration];
+            config.text = title;
+            config.secondaryText = sub;
+            config.image = [UIImage systemImageNamed:icon];
+            config.imageProperties.tintColor = [UIColor systemOrangeColor];
+            cell.contentConfiguration = config;
+        }
+        [optSwitch setOn:isOn animated:NO];
+        [optSwitch addTarget:self action:@selector(advancedOptionToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = optSwitch;
     }
 
     return cell;
@@ -254,31 +324,29 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
                 [self setSelectedModeForCurrentOrientation: (selectedMode == HUDPresetPositionTopCenterMost) ? HUDPresetPositionTopCenter : HUDPresetPositionTopCenterMost];
             } else {
                 [self setSelectedModeForCurrentOrientation:HUDPresetPositionTopCenter];
-                if (_supportsCenterMost) {
-                    [self presentTopCenterMostHints];
-                }
             }
         } else if (indexPath.row == 2) {
             [self setSelectedModeForCurrentOrientation:HUDPresetPositionTopRight];
         }
+        
+        [_impactFeedbackGenerator prepare];
+        [_impactFeedbackGenerator impactOccurred];
         [self reloadModeButtonState];
     }
 }
 
-// 高级选项开关切换逻辑
+// 统一的高级选项调度
 - (void)advancedOptionToggled:(UISwitch *)sender {
     BOOL isOn = sender.isOn;
     switch (sender.tag) {
-        case 0: [self setPassthroughMode:isOn]; break;
-        case 1: [self setSingleLineMode:isOn]; break;
-        case 2: [self setUsesBitrate:isOn]; break;
-        case 3: [self setUsesArrowPrefixes:isOn]; break;
-        case 4: [self setUsesLargeFont:isOn]; break;
-        case 5: [self setUsesRotation:isOn]; break;
-        case 6: [self setUsesInvertedColor:isOn]; break;
-        case 7: [self setKeepInPlace:isOn]; break;
-        case 8: [self setHideAtSnapshot:isOn]; break;
-        case 9: [self setDisplayMode:isOn]; break;
+        case 100: [self setPassthroughMode:isOn]; break;
+        case 101: [self setSingleLineMode:isOn]; break;
+        case 102: [self setUsesBitrate:isOn]; break;
+        case 103: [self setUsesArrowPrefixes:isOn]; break;
+        case 104: [self setUsesLargeFont:isOn]; break;
+        case 106: [self setUsesInvertedColor:isOn]; break;
+        case 107: [self setKeepInPlace:isOn]; break;
+        case 108: [self setHideAtSnapshot:isOn]; break;
     }
 }
 
@@ -353,7 +421,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             NSParagraphStyleAttributeName: creditsParaStyle,
         };
 
-        NSString *hintText = @"现在可以退出此 App，\n悬浮窗将持续在屏幕上显示。";
+        NSString *hintText = @"底层服务进程已注入，\n您可以安全地退出本应用。";
         hintAttributedString = [[NSAttributedString alloc] initWithString:hintText attributes:defaultAttributes];
 
         NSTextAttachment *githubIcon = [NSTextAttachment textAttachmentWithImage:[UIImage imageNamed:@"github-mark-white"]];
@@ -395,12 +463,14 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         
         UITableViewCell *cell = [strongSelf.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
         if (cell) {
-            NSString *titleText = strongSelf->_isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
+            NSString *titleText = strongSelf->_isRemoteHUDActive ? @"实时网速监控" : @"悬浮窗已关闭";
+            NSString *subText = strongSelf->_isRemoteHUDActive ? @"服务运行中，可退至桌面" : @"点击右侧开关以启动服务";
             if (@available(iOS 14.0, *)) {
                 UIListContentConfiguration *config = [cell defaultContentConfiguration];
                 config.text = titleText;
+                config.secondaryText = subText;
                 config.image = [UIImage systemImageNamed:@"speedometer"];
-                config.imageProperties.tintColor = [UIColor systemBlueColor];
+                config.imageProperties.tintColor = strongSelf->_isRemoteHUDActive ? [UIColor systemGreenColor] : [UIColor systemGrayColor];
                 cell.contentConfiguration = config;
             } else {
                 cell.textLabel.text = titleText;
@@ -458,13 +528,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         }
         [[UIApplication sharedApplication] suspend];
     }
-}
-
-- (void)presentTopCenterMostHints {
-    if (!_isRemoteHUDActive) {
-        return;
-    }
-    [_authorLabel setText:@"再次点击顶部居中按钮，\n可开启/关闭“灵动岛”模式。"];
 }
 
 - (void)tapAuthorLabel:(UITapGestureRecognizer *)sender
