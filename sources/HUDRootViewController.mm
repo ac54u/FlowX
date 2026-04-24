@@ -2,6 +2,9 @@
 //  HUDRootViewController.mm
 //  TrollSpeed - The Absolute Complete Edition
 //
+//  功能：系统级进程守护、锁屏监听、横竖屏旋转适配
+//  极客功能：流量每日统计持久化、X/Y 坐标精确偏移、双色渲染引擎
+//
 
 #import <notify.h>
 #import <net/if.h>
@@ -40,7 +43,29 @@ CFIndex CARenderServerGetDirtyFrameCount(void *);
 static BOOL needsBaselineReset = YES;
 static BOOL needsFPSBaselineReset = YES;
 
-#pragma mark - 系统监听逻辑 (原版核心)
+#pragma mark - 核心监控参数
+#define KILOBYTES (1 << 10)
+#define MEGABYTES (1 << 20)
+#define GIGABYTES (1 << 30)
+#define UPDATE_INTERVAL 1.0
+#define IDLE_INTERVAL 3.0
+
+static double HUD_FONT_SIZE = 9.0;
+static UIFontWeight HUD_FONT_WEIGHT = UIFontWeightRegular;
+static CGFloat HUD_INACTIVE_OPACITY = 0.667;
+static uint8_t HUD_DATA_UNIT = 0;
+static uint8_t HUD_SHOW_UPLOAD_SPEED = 1;
+static uint8_t HUD_SHOW_DOWNLOAD_SPEED = 1;
+static uint8_t HUD_SHOW_DOWNLOAD_SPEED_FIRST = 1;
+static uint8_t HUD_SHOW_SECOND_SPEED_IN_NEW_LINE = 0;
+static const char *HUD_UPLOAD_PREFIX = "▲";
+static const char *HUD_DOWNLOAD_PREFIX = "▼";
+static uint8_t HUD_DISPLAY_MODE = 0;
+static BOOL HUD_USES_DUAL_COLOR = YES;
+
+typedef struct { uint64_t inputBytes; uint64_t outputBytes; } UpDownBytes;
+
+#pragma mark - 系统监听逻辑
 
 static void LaunchServicesApplicationStateChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     BOOL isAppInstalled = NO;
@@ -66,36 +91,16 @@ static void SpringBoardLockStatusChanged(CFNotificationCenterRef center, void *o
     }
 }
 
-#pragma mark - 网速渲染引擎 (极客增强版)
+#pragma mark - 网速渲染与抓取引擎 (前置定义)
 
-#define KILOBYTES (1 << 10)
-#define MEGABYTES (1 << 20)
-#define GIGABYTES (1 << 30)
-#define UPDATE_INTERVAL 1.0
-
-static double HUD_FONT_SIZE = 9.0;
-static UIFontWeight HUD_FONT_WEIGHT = UIFontWeightRegular;
-static CGFloat HUD_INACTIVE_OPACITY = 0.667;
-static uint8_t HUD_DATA_UNIT = 0;
-static uint8_t HUD_SHOW_UPLOAD_SPEED = 1;
-static uint8_t HUD_SHOW_DOWNLOAD_SPEED = 1;
-static uint8_t HUD_SHOW_DOWNLOAD_SPEED_FIRST = 1;
-static uint8_t HUD_SHOW_SECOND_SPEED_IN_NEW_LINE = 0;
-static const char *HUD_UPLOAD_PREFIX = "▲";
-static const char *HUD_DOWNLOAD_PREFIX = "▼";
-static uint8_t HUD_DISPLAY_MODE = 0;
-static BOOL HUD_USES_DUAL_COLOR = YES;
-
-typedef struct { uint64_t inputBytes; uint64_t outputBytes; } UpDownBytes;
-
-// 格式化流量显示
+// 1. 格式化总流量 UI
 static NSString *formatTrafficUI(uint64_t bytes) {
     if (bytes < MEGABYTES) return [NSString stringWithFormat:@"%.1f KB", (double)bytes / KILOBYTES];
     if (bytes < GIGABYTES) return [NSString stringWithFormat:@"%.1f MB", (double)bytes / MEGABYTES];
     return [NSString stringWithFormat:@"%.2f GB", (double)bytes / GIGABYTES];
 }
 
-// 格式化实时网速数字
+// 2. 格式化实时网速数字
 static NSString *formattedSpeedValue(uint64_t bytes, BOOL isFocused) {
     NSString *unit = (HUD_DATA_UNIT == 0) ? (isFocused ? @" KB" : @" KB/s") : (isFocused ? @" Kb" : @" Kb/s");
     double val = (HUD_DATA_UNIT == 0) ? (double)bytes / KILOBYTES : (double)bytes / 1000.0;
@@ -111,7 +116,7 @@ static NSString *formattedSpeedValue(uint64_t bytes, BOOL isFocused) {
     return [NSString stringWithFormat:@"%.0f%@", val, unit];
 }
 
-// FPS 计算
+// 3. FPS 计算
 static NSAttributedString *getFPSString() {
     static CFIndex lastFC = 0;
     CFIndex now = CARenderServerGetDirtyFrameCount(NULL);
@@ -121,7 +126,7 @@ static NSAttributedString *getFPSString() {
     return [[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%.0f FPS", (double)diff] attributes:@{NSFontAttributeName:[UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName:[UIColor whiteColor]}];
 }
 
-// 网卡数据抓取
+// 4. 底层网卡数据抓取
 static UpDownBytes fetchNetBytes() {
     struct ifaddrs *ifa_list = 0, *ifa; UpDownBytes res = {0, 0};
     if (getifaddrs(&ifa_list) == -1) return res;
@@ -233,7 +238,7 @@ static UpDownBytes fetchNetBytes() {
         uint64_t inDiff = (now.inputBytes >= lastIn) ? now.inputBytes - lastIn : 0;
         lastIn = now.inputBytes; lastOut = now.outputBytes;
 
-        // 流量统计
+        // 流量统计记录与分发
         [self trackTraffic:outDiff + inDiff];
 
         if (HUD_DISPLAY_MODE == 1) {
@@ -267,6 +272,8 @@ static UpDownBytes fetchNetBytes() {
     uint64_t total = [[_userDefaults objectForKey:kDailyTrafficTotalBytes] unsignedLongLongValue];
     if (![today isEqualToString:[_userDefaults objectForKey:kDailyTrafficDate]]) { total = 0; [_userDefaults setObject:today forKey:kDailyTrafficDate]; }
     total += delta; [_userDefaults setObject:@(total) forKey:kDailyTrafficTotalBytes];
+    
+    // 向主 UI 发送流量数据
     dispatch_async(dispatch_get_main_queue(), ^{ [[NSNotificationCenter defaultCenter] postNotificationName:@"TrollSpeedUpdateTrafficUI" object:nil userInfo:@{@"total": formatTrafficUI(total)}]; });
 }
 
@@ -280,18 +287,31 @@ static UpDownBytes fetchNetBytes() {
     
     UILayoutGuide *lg = self.view.safeAreaLayoutGuide;
     [_constraints addObjectsFromArray:@[[_contentView.leadingAnchor constraintEqualToAnchor:lg.leadingAnchor constant:offX],[_contentView.trailingAnchor constraintEqualToAnchor:lg.trailingAnchor constant:offX]]];
-    if (mode == HUDPresetPositionTopCenterMost) [_constraints addObject:[_contentView.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:offY]];
-    else { _topConstraint = [_contentView.topAnchor constraintEqualToAnchor:lg.topAnchor constant:20+offY]; _topConstraint.priority = 250; [_constraints addObject:_topConstraint]; }
+    
+    if (mode == HUDPresetPositionTopCenterMost) {
+        [_constraints addObject:[_contentView.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:offY]];
+    } else {
+        _topConstraint = [_contentView.topAnchor constraintEqualToAnchor:lg.topAnchor constant:20+offY]; _topConstraint.priority = 250; [_constraints addObject:_topConstraint];
+    }
     
     if (isCentered) [_constraints addObject:[_speedLabel.centerXAnchor constraintEqualToAnchor:lg.centerXAnchor]];
     else if (mode == HUDPresetPositionTopLeft) [_constraints addObject:[_speedLabel.leadingAnchor constraintEqualToAnchor:_contentView.leadingAnchor constant:10]];
     else [_constraints addObject:[_speedLabel.trailingAnchor constraintEqualToAnchor:_contentView.trailingAnchor constant:-10]];
     
-    [_constraints addObjectsFromArray:@[[_speedLabel.topAnchor constraintEqualToAnchor:_contentView.topAnchor],[_speedLabel.bottomAnchor constraintEqualToAnchor:_contentView.bottomAnchor],[_blurView.topAnchor constraintEqualToAnchor:_speedLabel.topAnchor constant:-2],[_blurView.leadingAnchor constraintEqualToAnchor:_speedLabel.leadingAnchor constant:-4],[_blurView.trailingAnchor constraintEqualToAnchor:_speedLabel.trailingAnchor constant:4],[_blurView.bottomAnchor constraintEqualToAnchor:_speedLabel.bottomAnchor constant:2],[_lockedView.centerXAnchor constraintEqualToAnchor:_blurView.centerXAnchor],[_lockedView.centerYAnchor constraintEqualToAnchor:_blurView.centerYAnchor]]];
+    [_constraints addObjectsFromArray:@[
+        [_speedLabel.topAnchor constraintEqualToAnchor:_contentView.topAnchor],
+        [_speedLabel.bottomAnchor constraintEqualToAnchor:_contentView.bottomAnchor],
+        [_blurView.topAnchor constraintEqualToAnchor:_speedLabel.topAnchor constant:-2],
+        [_blurView.leadingAnchor constraintEqualToAnchor:_speedLabel.leadingAnchor constant:-4],
+        [_blurView.trailingAnchor constraintEqualToAnchor:_speedLabel.trailingAnchor constant:4],
+        [_blurView.bottomAnchor constraintEqualToAnchor:_speedLabel.bottomAnchor constant:2],
+        [_lockedView.centerXAnchor constraintEqualToAnchor:_blurView.centerXAnchor],
+        [_lockedView.centerYAnchor constraintEqualToAnchor:_blurView.centerYAnchor]
+    ]];
     [NSLayoutConstraint activateConstraints:_constraints];
 }
 
-// 基础工具
+// 基础辅助方法
 - (void)resetLoopTimer { [_timer invalidate]; _timer = [NSTimer scheduledTimerWithTimeInterval:UPDATE_INTERVAL target:self selector:@selector(updateSpeedLabel) userInfo:nil repeats:YES]; }
 - (void)stopLoopTimer { [_timer invalidate]; _timer = nil; }
 - (void)loadUserDefaults:(BOOL)f { if (f || !_userDefaults) _userDefaults = [[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] mutableCopy] ?: [NSMutableDictionary dictionary]; }
