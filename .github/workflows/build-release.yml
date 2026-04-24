@@ -3,9 +3,8 @@ name: Build Release
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*.*"
-      - "v*.*.*"
+    branches:
+      - main
 
 env:
   THEOS: ''
@@ -14,7 +13,7 @@ env:
 
 jobs:
   build:
-    name: Build and upload release package for TrollStore
+    name: Build and upload package
     runs-on: macos-14
 
     steps:
@@ -47,11 +46,9 @@ jobs:
           ref: master
           path: ${{ env.THEOS }}/sdks
 
-      - name: Checkout
+      - name: Checkout Your Repository
         uses: actions/checkout@v4
         with:
-          repository: Lessica/TrollSpeed
-          ref: main
           path: TrollSpeed
           submodules: recursive
 
@@ -71,33 +68,11 @@ jobs:
           THEOS_PACKAGE_SCHEME=rootless FINALPACKAGE=1 gmake clean package
           FINALPACKAGE=1 gmake clean package
 
-      - name: Collect symbols
-        run: |
-          cd $GITHUB_WORKSPACE/TrollSpeed
-          find .theos/obj -name "*.dSYM" -print | zip -r packages/TrollSpeed_${{ env.PKG_VERSION }}_symbols.zip -@
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TrollSpeed_${{ env.PKG_VERSION }}
+          name: TrollSpeed_${{ env.PKG_VERSION }}_Modified
           path: |
-            TrollSpeed/packages/TrollSpeed_*.tipa
-            TrollSpeed/packages/TrollSpeed+AppIntents16_*.tipa
-            TrollSpeed/packages/ch.xxtou.hudapp.jb_*.deb
-
-      - name: Upload symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: TrollSpeed_${{ env.PKG_VERSION }}_symbols
-          path: |
-            TrollSpeed/packages/TrollSpeed_${{ env.PKG_VERSION }}_symbols.zip
-
-      - name: Upload release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ env.PKG_VERSION }}
-          body_path: TrollSpeed/CHANGELOG.md
-          files: |
             TrollSpeed/packages/TrollSpeed_*.tipa
             TrollSpeed/packages/TrollSpeed+AppIntents16_*.tipa
             TrollSpeed/packages/ch.xxtou.hudapp.jb_*.deb
