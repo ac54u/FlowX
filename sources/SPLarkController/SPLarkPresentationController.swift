@@ -58,7 +58,12 @@ class SPLarkPresentationController: UIPresentationController, UIGestureRecognize
     private var safeArea: UIEdgeInsets {
         if #available(iOS 11.0, *) {
             if #available(iOS 13.0, *) {
-                return UIApplication.shared.windows.first?.safeAreaInsets ?? UIEdgeInsets.zero
+                let keyWindow = UIApplication.shared.connectedScenes
+    .filter({$0.activationState == .foregroundActive})
+    .compactMap({$0 as? UIWindowScene})
+    .first?.windows
+    .filter({$0.isKeyWindow}).first
+return keyWindow?.safeAreaInsets ?? UIEdgeInsets.zero
             } else {
                 return UIApplication.shared.keyWindow?.safeAreaInsets ?? UIEdgeInsets.zero
             }

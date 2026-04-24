@@ -46,7 +46,12 @@ extension UIViewController {
         var safeArea = UIEdgeInsets.zero
         if #available(iOS 11.0, *) {
             if #available(iOS 13.0, *) {
-                safeArea = UIApplication.shared.windows.first?.safeAreaInsets ?? UIEdgeInsets.zero
+                let keyWindow = UIApplication.shared.connectedScenes
+    .filter({$0.activationState == .foregroundActive})
+    .compactMap({$0 as? UIWindowScene})
+    .first?.windows
+    .filter({$0.isKeyWindow}).first
+safeArea = keyWindow?.safeAreaInsets ?? UIEdgeInsets.zero
             } else {
                 safeArea = UIApplication.shared.keyWindow?.safeAreaInsets ?? UIEdgeInsets.zero
             }
