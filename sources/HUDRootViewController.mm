@@ -1,9 +1,8 @@
 //
 //  HUDRootViewController.mm
-//  TrollSpeed - The Absolute Complete Edition
+//  TrollSpeed - The Absolute Complete Edition (Compiler Fixed)
 //
-//  功能：系统级进程守护、锁屏监听、横竖屏旋转适配
-//  极客功能：流量每日统计持久化、X/Y 坐标精确偏移、双色渲染引擎
+//  修复：iOS 14 色彩兼容性问题，补全 passthroughMode 穿透接口
 //
 
 #import <notify.h>
@@ -91,16 +90,14 @@ static void SpringBoardLockStatusChanged(CFNotificationCenterRef center, void *o
     }
 }
 
-#pragma mark - 网速渲染与抓取引擎 (前置定义)
+#pragma mark - 网速渲染与抓取引擎
 
-// 1. 格式化总流量 UI
 static NSString *formatTrafficUI(uint64_t bytes) {
     if (bytes < MEGABYTES) return [NSString stringWithFormat:@"%.1f KB", (double)bytes / KILOBYTES];
     if (bytes < GIGABYTES) return [NSString stringWithFormat:@"%.1f MB", (double)bytes / MEGABYTES];
     return [NSString stringWithFormat:@"%.2f GB", (double)bytes / GIGABYTES];
 }
 
-// 2. 格式化实时网速数字
 static NSString *formattedSpeedValue(uint64_t bytes, BOOL isFocused) {
     NSString *unit = (HUD_DATA_UNIT == 0) ? (isFocused ? @" KB" : @" KB/s") : (isFocused ? @" Kb" : @" Kb/s");
     double val = (HUD_DATA_UNIT == 0) ? (double)bytes / KILOBYTES : (double)bytes / 1000.0;
@@ -116,7 +113,6 @@ static NSString *formattedSpeedValue(uint64_t bytes, BOOL isFocused) {
     return [NSString stringWithFormat:@"%.0f%@", val, unit];
 }
 
-// 3. FPS 计算
 static NSAttributedString *getFPSString() {
     static CFIndex lastFC = 0;
     CFIndex now = CARenderServerGetDirtyFrameCount(NULL);
@@ -126,7 +122,6 @@ static NSAttributedString *getFPSString() {
     return [[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%.0f FPS", (double)diff] attributes:@{NSFontAttributeName:[UIFont monospacedDigitSystemFontOfSize:HUD_FONT_SIZE weight:HUD_FONT_WEIGHT], NSForegroundColorAttributeName:[UIColor whiteColor]}];
 }
 
-// 4. 底层网卡数据抓取
 static UpDownBytes fetchNetBytes() {
     struct ifaddrs *ifa_list = 0, *ifa; UpDownBytes res = {0, 0};
     if (getifaddrs(&ifa_list) == -1) return res;
@@ -156,6 +151,11 @@ static UpDownBytes fetchNetBytes() {
     NSLayoutConstraint *_topConstraint;
     UIInterfaceOrientation _orientation;
     FBSOrientationObserver *_orientationObserver;
+}
+
+// 补全由于精简被误删的核心类方法，底层 Hook 需要用到它
++ (BOOL)passthroughMode {
+    return [[[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] objectForKey:HUDUserDefaultsKeyPassthroughMode] boolValue];
 }
 
 - (instancetype)init {
@@ -245,7 +245,8 @@ static UpDownBytes fetchNetBytes() {
             [_speedLabel setAttributedText:getFPSString()];
         } else {
             UIColor *uCol = HUD_USES_DUAL_COLOR ? [UIColor systemOrangeColor] : [UIColor whiteColor];
-            UIColor *dCol = HUD_USES_DUAL_COLOR ? [UIColor systemCyanColor] : [UIColor whiteColor];
+            // 使用 systemTealColor 替代 systemCyanColor 以兼容 iOS 14
+            UIColor *dCol = HUD_USES_DUAL_COLOR ? [UIColor systemTealColor] : [UIColor whiteColor];
             if (HUD_FONT_WEIGHT == UIFontWeightMedium) { uCol = [UIColor clearColor]; dCol = [UIColor clearColor]; }
 
             NSMutableAttributedString *ms = [NSMutableAttributedString new];
