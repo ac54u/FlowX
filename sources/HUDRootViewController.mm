@@ -1,8 +1,8 @@
 //
 //  HUDRootViewController.mm
-//  TrollSpeed - The Absolute Complete Edition (Compiler Fixed)
+//  TrollSpeed - Free Drag Edition
 //
-//  修复：iOS 14 色彩兼容性问题，补全 passthroughMode 穿透接口
+//  解锁 2D 任意拖拽功能，支持屏幕边缘停靠与坐标热更新。
 //
 
 #import <notify.h>
@@ -92,12 +92,6 @@ static void SpringBoardLockStatusChanged(CFNotificationCenterRef center, void *o
 
 #pragma mark - 网速渲染与抓取引擎
 
-static NSString *formatTrafficUI(uint64_t bytes) {
-    if (bytes < MEGABYTES) return [NSString stringWithFormat:@"%.1f KB", (double)bytes / KILOBYTES];
-    if (bytes < GIGABYTES) return [NSString stringWithFormat:@"%.1f MB", (double)bytes / MEGABYTES];
-    return [NSString stringWithFormat:@"%.2f GB", (double)bytes / GIGABYTES];
-}
-
 static NSString *formattedSpeedValue(uint64_t bytes, BOOL isFocused) {
     NSString *unit = (HUD_DATA_UNIT == 0) ? (isFocused ? @" KB" : @" KB/s") : (isFocused ? @" Kb" : @" Kb/s");
     double val = (HUD_DATA_UNIT == 0) ? (double)bytes / KILOBYTES : (double)bytes / 1000.0;
@@ -148,12 +142,19 @@ static UpDownBytes fetchNetBytes() {
     UIImageView *_lockedView;
     NSTimer *_timer;
     BOOL _isFocused;
-    NSLayoutConstraint *_topConstraint;
     UIInterfaceOrientation _orientation;
     FBSOrientationObserver *_orientationObserver;
+    
+    // 动态约束（支持平滑拖拽）
+    NSLayoutConstraint *_contentLeadingConstraint;
+    NSLayoutConstraint *_contentTrailingConstraint;
+    NSLayoutConstraint *_topConstraint;
+    NSLayoutConstraint *_centerTopConstraint;
+    
+    UIImpactFeedbackGenerator *_impactFeedbackGenerator;
+    UINotificationFeedbackGenerator *_notificationFeedbackGenerator;
 }
 
-// 补全由于精简被误删的核心类方法，底层 Hook 需要用到它
 + (BOOL)passthroughMode {
     return [[[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] objectForKey:HUDUserDefaultsKeyPassthroughMode] boolValue];
 }
@@ -197,6 +198,14 @@ static UpDownBytes fetchNetBytes() {
     _lockedView.translatesAutoresizingMaskIntoConstraints = NO; _lockedView.alpha = 0;
     [_blurView.contentView addSubview:_lockedView];
     
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGestureRecognized:)];
+    [_contentView addGestureRecognizer:tap];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGestureRecognized:)];
+    [_contentView addGestureRecognizer:pan];
+    
+    [_contentView setUserInteractionEnabled:YES];
+    
     [self reloadUserDefaults];
 }
 
@@ -238,14 +247,12 @@ static UpDownBytes fetchNetBytes() {
         uint64_t inDiff = (now.inputBytes >= lastIn) ? now.inputBytes - lastIn : 0;
         lastIn = now.inputBytes; lastOut = now.outputBytes;
 
-        // 流量统计记录与分发
         [self trackTraffic:outDiff + inDiff];
 
         if (HUD_DISPLAY_MODE == 1) {
             [_speedLabel setAttributedText:getFPSString()];
         } else {
             UIColor *uCol = HUD_USES_DUAL_COLOR ? [UIColor systemOrangeColor] : [UIColor whiteColor];
-            // 使用 systemTealColor 替代 systemCyanColor 以兼容 iOS 14
             UIColor *dCol = HUD_USES_DUAL_COLOR ? [UIColor systemTealColor] : [UIColor whiteColor];
             if (HUD_FONT_WEIGHT == UIFontWeightMedium) { uCol = [UIColor clearColor]; dCol = [UIColor clearColor]; }
 
@@ -268,31 +275,59 @@ static UpDownBytes fetchNetBytes() {
 }
 
 - (void)trackTraffic:(uint64_t)delta {
-    [self loadUserDefaults:NO];
-    NSString *today = [NSDateFormatter localizedStringFromDate:[NSDate date] dateStyle:NSDateFormatterShortStyle timeStyle:NSDateFormatterNoStyle];
-    uint64_t total = [[_userDefaults objectForKey:kDailyTrafficTotalBytes] unsignedLongLongValue];
-    if (![today isEqualToString:[_userDefaults objectForKey:kDailyTrafficDate]]) { total = 0; [_userDefaults setObject:today forKey:kDailyTrafficDate]; }
-    total += delta; [_userDefaults setObject:@(total) forKey:kDailyTrafficTotalBytes];
+    static uint64_t uncommittedBytes = 0;
+    static int tick = 0;
+    uncommittedBytes += delta;
     
-    // 向主 UI 发送流量数据
-    dispatch_async(dispatch_get_main_queue(), ^{ [[NSNotificationCenter defaultCenter] postNotificationName:@"TrollSpeedUpdateTrafficUI" object:nil userInfo:@{@"total": formatTrafficUI(total)}]; });
+    if (++tick >= 3) {
+        [self loadUserDefaults:NO];
+        NSString *today = [NSDateFormatter localizedStringFromDate:[NSDate date] dateStyle:NSDateFormatterShortStyle timeStyle:NSDateFormatterNoStyle];
+        uint64_t total = [[_userDefaults objectForKey:kDailyTrafficTotalBytes] unsignedLongLongValue];
+        if (![today isEqualToString:[_userDefaults objectForKey:kDailyTrafficDate]]) {
+            total = 0;
+            [_userDefaults setObject:today forKey:kDailyTrafficDate];
+        }
+        total += uncommittedBytes;
+        uncommittedBytes = 0;
+        [_userDefaults setObject:@(total) forKey:kDailyTrafficTotalBytes];
+        [_userDefaults writeToFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) atomically:YES];
+        
+        notify_post("ch.xxtou.hudapp.traffic_update");
+        tick = 0;
+    }
 }
 
+// ==========================================
+// 自由拖拽布局引擎 (重构)
+// ==========================================
 - (void)updateViewConstraints {
-    [NSLayoutConstraint deactivateConstraints:_constraints]; [_constraints removeAllObjects];
-    HUDPresetPosition mode = [self selectedModeForCurrentOrientation]; BOOL isCentered = (mode == HUDPresetPositionTopCenter || mode == HUDPresetPositionTopCenterMost);
+    [NSLayoutConstraint deactivateConstraints:_constraints];
+    [_constraints removeAllObjects];
+
+    [self loadUserDefaults:NO];
+    HUDPresetPosition mode = [_userDefaults objectForKey:@"HUDUserDefaultsKeySelectedMode"] ? (HUDPresetPosition)[[_userDefaults objectForKey:@"HUDUserDefaultsKeySelectedMode"] integerValue] : HUDPresetPositionTopCenter;
+    BOOL isCentered = (mode == HUDPresetPositionTopCenter || mode == HUDPresetPositionTopCenterMost);
     
     NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
-    CGFloat offX = [defs doubleForKey:@"realCustomOffsetX"];
-    CGFloat offY = [defs doubleForKey:@"realCustomOffsetY"];
+    CGFloat offX = [defs boolForKey:@"UsesCustomOffset"] ? [defs doubleForKey:@"realCustomOffsetX"] : 0;
+    CGFloat offY = [defs boolForKey:@"UsesCustomOffset"] ? [defs doubleForKey:@"realCustomOffsetY"] : 0;
     
     UILayoutGuide *lg = self.view.safeAreaLayoutGuide;
-    [_constraints addObjectsFromArray:@[[_contentView.leadingAnchor constraintEqualToAnchor:lg.leadingAnchor constant:offX],[_contentView.trailingAnchor constraintEqualToAnchor:lg.trailingAnchor constant:offX]]];
+    
+    // 捕获动态约束，以便拖拽时热更新
+    _contentLeadingConstraint = [_contentView.leadingAnchor constraintEqualToAnchor:lg.leadingAnchor constant:offX];
+    _contentTrailingConstraint = [_contentView.trailingAnchor constraintEqualToAnchor:lg.trailingAnchor constant:offX];
+    [_constraints addObjectsFromArray:@[_contentLeadingConstraint, _contentTrailingConstraint]];
     
     if (mode == HUDPresetPositionTopCenterMost) {
-        [_constraints addObject:[_contentView.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:offY]];
+        _centerTopConstraint = [_contentView.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:offY];
+        [_constraints addObject:_centerTopConstraint];
+        _topConstraint = nil;
     } else {
-        _topConstraint = [_contentView.topAnchor constraintEqualToAnchor:lg.topAnchor constant:20+offY]; _topConstraint.priority = 250; [_constraints addObject:_topConstraint];
+        _topConstraint = [_contentView.topAnchor constraintEqualToAnchor:lg.topAnchor constant:20 + offY];
+        _topConstraint.priority = 250;
+        [_constraints addObject:_topConstraint];
+        _centerTopConstraint = nil;
     }
     
     if (isCentered) [_constraints addObject:[_speedLabel.centerXAnchor constraintEqualToAnchor:lg.centerXAnchor]];
@@ -312,13 +347,99 @@ static UpDownBytes fetchNetBytes() {
     [NSLayoutConstraint activateConstraints:_constraints];
 }
 
+// ==========================================
+// 交互：2D 自由平滑拖拽手势
+// ==========================================
+- (void)panGestureRecognized:(UIPanGestureRecognizer *)sender {
+    static CGFloat beginX = 0.0;
+    static CGFloat beginY = 0.0;
+
+    if (sender.state == UIGestureRecognizerStateBegan) {
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(onBlur:) object:sender.view];
+        
+        NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
+        beginX = [defs doubleForKey:@"realCustomOffsetX"];
+        beginY = [defs doubleForKey:@"realCustomOffsetY"];
+        
+        if (!_notificationFeedbackGenerator) _notificationFeedbackGenerator = [[UINotificationFeedbackGenerator alloc] init];
+        [_notificationFeedbackGenerator prepare];
+        [_notificationFeedbackGenerator notificationOccurred:UINotificationFeedbackTypeError];
+        
+        [UIView animateWithDuration:0.2 animations:^{
+            sender.view.transform = CGAffineTransformMakeScale(1.08, 1.08);
+            sender.view.alpha = 1.0;
+        }];
+    } 
+    else if (sender.state == UIGestureRecognizerStateChanged) {
+        CGPoint trans = [sender translationInView:sender.view.superview];
+        CGFloat newX = beginX + trans.x;
+        CGFloat newY = beginY + trans.y;
+        
+        _contentLeadingConstraint.constant = newX;
+        _contentTrailingConstraint.constant = newX;
+        if (_topConstraint) _topConstraint.constant = 20 + newY;
+        if (_centerTopConstraint) _centerTopConstraint.constant = newY;
+        
+        [self.view layoutIfNeeded]; // 实时平滑更新位置
+    } 
+    else if (sender.state == UIGestureRecognizerStateEnded || sender.state == UIGestureRecognizerStateCancelled || sender.state == UIGestureRecognizerStateFailed) {
+        CGPoint trans = [sender translationInView:sender.view.superview];
+        CGFloat newX = beginX + trans.x;
+        CGFloat newY = beginY + trans.y;
+        
+        // 拖拽结束，持久化最新坐标
+        NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
+        [defs setBool:YES forKey:@"UsesCustomOffset"];
+        [defs setDouble:newX forKey:@"realCustomOffsetX"];
+        [defs setDouble:newY forKey:@"realCustomOffsetY"];
+        
+        [self loadUserDefaults:NO];
+        [_userDefaults setObject:@(YES) forKey:@"UsesCustomOffset"];
+        [_userDefaults setObject:@(newX) forKey:@"realCustomOffsetX"];
+        [_userDefaults setObject:@(newY) forKey:@"realCustomOffsetY"];
+        [self saveUserDefaults];
+        
+        [UIView animateWithDuration:0.2 animations:^{
+            sender.view.transform = CGAffineTransformIdentity;
+        } completion:^(BOOL finished) {
+            [self performSelector:@selector(onBlur:) withObject:sender.view afterDelay:IDLE_INTERVAL];
+        }];
+    }
+
+    if (!_impactFeedbackGenerator) _impactFeedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    if (sender.state == UIGestureRecognizerStateBegan || sender.state == UIGestureRecognizerStateEnded) {
+        [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
+    }
+}
+
+// 触摸聚焦动画
+- (void)tapGestureRecognized:(UITapGestureRecognizer *)sender {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(onBlur:) object:sender.view];
+    _isFocused = YES;
+    [self updateSpeedLabel];
+    
+    [UIView animateWithDuration:0.2 animations:^{
+        sender.view.transform = CGAffineTransformMakeScale(1.05, 1.05);
+        sender.view.alpha = 1.0;
+    } completion:^(BOOL finished) {
+        [self performSelector:@selector(onBlur:) withObject:sender.view afterDelay:IDLE_INTERVAL];
+    }];
+}
+
+- (void)onBlur:(UIView *)view {
+    _isFocused = NO;
+    [self updateSpeedLabel];
+    [UIView animateWithDuration:0.6 animations:^{
+        view.transform = CGAffineTransformIdentity;
+        view.alpha = HUD_INACTIVE_OPACITY;
+    }];
+}
+
 // 基础辅助方法
 - (void)resetLoopTimer { [_timer invalidate]; _timer = [NSTimer scheduledTimerWithTimeInterval:UPDATE_INTERVAL target:self selector:@selector(updateSpeedLabel) userInfo:nil repeats:YES]; }
 - (void)stopLoopTimer { [_timer invalidate]; _timer = nil; }
 - (void)loadUserDefaults:(BOOL)f { if (f || !_userDefaults) _userDefaults = [[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] mutableCopy] ?: [NSMutableDictionary dictionary]; }
 - (UIRectEdge)preferredScreenEdgesDeferringSystemGestures { return UIRectEdgeNone; }
 - (BOOL)prefersStatusBarHidden { return NO; }
-- (HUDPresetPosition)selectedModeForCurrentOrientation { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:[self selectedModeKeyForCurrentOrientation]]; return m ? (HUDPresetPosition)[m integerValue] : HUDPresetPositionTopCenter; }
-- (HUDUserDefaultsKey)selectedModeKeyForCurrentOrientation { UIInterfaceOrientation o = self.view.window.windowScene.interfaceOrientation; return UIInterfaceOrientationIsLandscape(o) ? HUDUserDefaultsKeySelectedModeLandscape : HUDUserDefaultsKeySelectedMode; }
 - (void)updateOrientation:(UIInterfaceOrientation)o animateWithDuration:(NSTimeInterval)d { [self updateViewConstraints]; }
 @end
