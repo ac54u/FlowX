@@ -2,7 +2,7 @@
 //  RootViewController.mm
 //  TrollSpeed
 //
-//  Refactored with Pure Native Inset Grouped UI
+//  Refactored with Pure Native Inset Grouped UI (Fixed Crash & Localization)
 //
 
 #import <notify.h>
@@ -65,7 +65,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 // ==========================================
-// 原生质感 Inset Grouped UI 重写
+// 原生质感 UI 初始化
 // ==========================================
 - (void)loadView
 {
@@ -90,22 +90,16 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [headerView addSubview:headerLabel];
     self.tableView.tableHeaderView = headerView;
 
-    // 3. 底部致谢与提示 (复用原作者设定)
+    // 3. 底部致谢 (放弃 AutoLayout，改用 frame 避免某些情况下的约束闪退)
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 100)];
-    _authorLabel = [[UILabel alloc] init];
+    _authorLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 10, bounds.size.width - 40, 80)];
     _authorLabel.numberOfLines = 0;
     _authorLabel.textAlignment = NSTextAlignmentCenter;
     _authorLabel.textColor = [UIColor secondaryLabelColor];
     _authorLabel.font = [UIFont systemFontOfSize:13.0];
-    _authorLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    _authorLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _authorLabel.userInteractionEnabled = YES;
     [footerView addSubview:_authorLabel];
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [_authorLabel.topAnchor constraintEqualToAnchor:footerView.topAnchor constant:10],
-        [_authorLabel.centerXAnchor constraintEqualToAnchor:footerView.centerXAnchor],
-        [_authorLabel.widthAnchor constraintLessThanOrEqualToAnchor:footerView.widthAnchor constant:-40]
-    ]];
     
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapAuthorLabel:)];
     [_authorLabel addGestureRecognizer:tap];
@@ -134,25 +128,25 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 // ==========================================
-// UITableView DataSource & Delegate
+// UITableView DataSource & Delegate (完全中文化)
 // ==========================================
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    // 紧凑模式（如小屏幕横屏）下隐藏设置分组
     return (self.traitCollection.verticalSizeClass == UIUserInterfaceSizeClassCompact) ? 2 : 3;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 1; // 状态开关
-    if (section == 1) return 3; // 3个位置选项
-    if (section == 2) return 1; // 高级设置
+    if (section == 0) return 1; 
+    if (section == 1) return 3; 
+    if (section == 2) return 1; 
     return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return NSLocalizedString(@"STATUS", nil);
-    if (section == 1) return NSLocalizedString(@"POSITION", nil);
-    if (section == 2) return NSLocalizedString(@"ADVANCED", nil);
+    // 修复：直接输出中文
+    if (section == 0) return @"运行状态";
+    if (section == 1) return @"显示位置";
+    if (section == 2) return @"高级选项";
     return nil;
 }
 
@@ -163,14 +157,13 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:CellId];
     }
 
-    // 重置 Cell 状态
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.accessoryView = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 
     if (indexPath.section == 0) {
-        // 核心网速悬浮窗开关
-        NSString *title = _isRemoteHUDActive ? NSLocalizedString(@"HUD Active", nil) : NSLocalizedString(@"HUD Inactive", nil);
+        // 修复：直接输出中文
+        NSString *title = _isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
             config.text = title;
@@ -186,23 +179,23 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
     else if (indexPath.section == 1) {
-        // 位置选择器
         HUDPresetPosition selectedMode = [self selectedModeForCurrentOrientation];
         NSString *title = @"";
         NSString *iconName = @"";
         BOOL isSelected = NO;
 
+        // 修复：直接输出中文
         if (indexPath.row == 0) {
-            title = NSLocalizedString(@"Top Left", nil);
+            title = @"左上角";
             iconName = @"arrow.up.left";
             isSelected = (selectedMode == HUDPresetPositionTopLeft);
         } else if (indexPath.row == 1) {
             BOOL isCenteredMost = (selectedMode == HUDPresetPositionTopCenterMost);
-            title = isCenteredMost ? NSLocalizedString(@"Top Center (Island)", nil) : NSLocalizedString(@"Top Center", nil);
+            title = isCenteredMost ? @"顶部居中 (灵动岛)" : @"顶部居中";
             iconName = isCenteredMost ? @"arrow.up.to.line" : @"arrow.up";
             isSelected = (selectedMode == HUDPresetPositionTopCenter || selectedMode == HUDPresetPositionTopCenterMost);
         } else if (indexPath.row == 2) {
-            title = NSLocalizedString(@"Top Right", nil);
+            title = @"右上角";
             iconName = @"arrow.up.right";
             isSelected = (selectedMode == HUDPresetPositionTopRight);
         }
@@ -219,15 +212,15 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         cell.accessoryType = isSelected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     }
     else if (indexPath.section == 2) {
-        // 设置页入口
+        // 修复：直接输出中文
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
-            config.text = NSLocalizedString(@"Settings", nil);
+            config.text = @"高级设置";
             config.image = [UIImage systemImageNamed:@"gear"];
             config.imageProperties.tintColor = [UIColor systemGrayColor];
             cell.contentConfiguration = config;
         } else {
-            cell.textLabel.text = NSLocalizedString(@"Settings", nil);
+            cell.textLabel.text = @"高级设置";
             cell.imageView.image = [UIImage systemImageNamed:@"gear"];
         }
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -266,9 +259,12 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 // 核心交互逻辑与状态更新
 // ==========================================
 - (void)mainSwitchToggled:(UISwitch *)sender {
-    // 视觉上先强制恢复为实际状态，等待后端处理完毕后再统一更新 UI，防止连续误触卡死
+    BOOL intendedState = sender.isOn;
+    // UI上先恢复，防止状态还没生效就改变
     [sender setOn:_isRemoteHUDActive animated:NO]; 
-    [self toggleMainHUDState];
+    if (intendedState != _isRemoteHUDActive) {
+        [self toggleMainHUDState];
+    }
 }
 
 - (void)toggleMainHUDState {
@@ -331,7 +327,8 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             NSParagraphStyleAttributeName: creditsParaStyle,
         };
 
-        NSString *hintText = NSLocalizedString(@"You can quit this app now.\nThe HUD will persist on your screen.", nil);
+        // 修复：翻译为中文
+        NSString *hintText = @"现在可以退出此 App，\n悬浮窗将持续在屏幕上显示。";
         hintAttributedString = [[NSAttributedString alloc] initWithString:hintText attributes:defaultAttributes];
 
         NSTextAttachment *githubIcon = [NSTextAttachment textAttachmentWithImage:[UIImage imageNamed:@"github-mark-white"]];
@@ -371,17 +368,27 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         __strong typeof(weakSelf) strongSelf = weakSelf;
         [strongSelf->_mainSwitch setOn:strongSelf->_isRemoteHUDActive animated:YES];
         
-        // 更新第一组的 Cell 文本
-        if (strongSelf.tableView.numberOfSections > 0) {
-            [strongSelf.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
+        // 【关键修复点】：绝对不能在动画块里使用 reloadRows，会直接闪退！改为直接拿到 Cell 并修改文本
+        UITableViewCell *cell = [strongSelf.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+        if (cell) {
+            NSString *titleText = strongSelf->_isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
+            if (@available(iOS 14.0, *)) {
+                UIListContentConfiguration *config = [cell defaultContentConfiguration];
+                config.text = titleText;
+                config.image = [UIImage systemImageNamed:@"speedometer"];
+                config.imageProperties.tintColor = [UIColor systemBlueColor];
+                cell.contentConfiguration = config;
+            } else {
+                cell.textLabel.text = titleText;
+            }
         }
+        
         [strongSelf->_authorLabel setAttributedText:(strongSelf->_isRemoteHUDActive ? hintAttributedString : creditsAttributedString)];
     } completion:nil];
 }
 
 - (void)reloadModeButtonState
 {
-    // 仅刷新位置选项所在的分组
     if (self.tableView.numberOfSections > 1) {
         [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationNone];
     }
@@ -433,7 +440,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     if (!_isRemoteHUDActive) {
         return;
     }
-    [_authorLabel setText:NSLocalizedString(@"Tap that button on the center again,\nto toggle ON/OFF “Dynamic Island” mode.", nil)];
+    [_authorLabel setText:@"再次点击顶部居中按钮，\n可开启/关闭“灵动岛”模式。"];
 }
 
 - (void)tapAuthorLabel:(UITapGestureRecognizer *)sender
@@ -487,13 +494,13 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 // ==========================================
 - (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
     if (motion == UIEventSubtypeMotionShake) {
-        UIAlertController *alertController = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Developer Area", nil) message:NSLocalizedString(@"Choose an action below.", nil) preferredStyle:UIAlertControllerStyleAlert];
-        [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Dismiss", nil) style:UIAlertActionStyleCancel handler:nil]];
-        [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Reset Settings", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"开发者选项" message:@"请选择操作" preferredStyle:UIAlertControllerStyleAlert];
+        [alertController addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [alertController addAction:[UIAlertAction actionWithTitle:@"重置所有设置" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             [self resetUserDefaults];
         }]];
 #if DEBUG && !TARGET_OS_SIMULATOR
-        [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Memory Pressure", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+        [alertController addAction:[UIAlertAction actionWithTitle:@"内存压力测试" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
             SimulateMemoryPressure();
         }]];
 #endif
