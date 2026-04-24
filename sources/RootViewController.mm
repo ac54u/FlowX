@@ -1,6 +1,8 @@
 //
 //  RootViewController.mm
-//  TrollSpeed - Extreme Edition (Fixed Build)
+//  TrollSpeed - Extreme Edition (Final Complete UI)
+//
+//  功能：现代磁贴化网格 UI、X/Y 坐标精确滑动条、全量协议实现、手势拦截修复
 //
 
 #import <notify.h>
@@ -16,7 +18,7 @@
 #define HUD_TRANSITION_DURATION 0.25
 
 // ==========================================
-// 组件：现代磁贴按钮
+// 组件 1：现代磁贴按钮 (TSTileButton)
 // ==========================================
 @interface TSTileButton : UIControl
 @property (nonatomic, strong) UIImageView *iconView;
@@ -31,17 +33,21 @@
         self.layer.cornerRadius = 14;
         self.layer.cornerCurve = kCACornerCurveContinuous;
         self.backgroundColor = [UIColor secondarySystemFillColor];
+        
         _iconView = [[UIImageView alloc] init];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
         _iconView.tintColor = [UIColor labelColor];
         _iconView.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_iconView];
+        
         _titleLabel = [[UILabel alloc] init];
         _titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
         _titleLabel.textColor = [UIColor secondaryLabelColor];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        _titleLabel.adjustsFontSizeToFitWidth = YES;
         [self addSubview:_titleLabel];
+        
         [NSLayoutConstraint activateConstraints:@[
             [_iconView.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
             [_iconView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-8],
@@ -52,6 +58,7 @@
             [_titleLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:2],
             [_titleLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-2]
         ]];
+        
         [self addTarget:self action:@selector(touchDown) forControlEvents:UIControlEventTouchDown];
         [self addTarget:self action:@selector(touchUp) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
     }
@@ -78,7 +85,7 @@
 @end
 
 // ==========================================
-// 组件：偏移调节卡片
+// 组件 2：偏移调节卡片 (TSOffsetCard)
 // ==========================================
 @interface TSOffsetCard : UIView
 @property (nonatomic, strong) UISlider *xSlider;
@@ -91,11 +98,15 @@
         self.layer.cornerRadius = 20;
         self.layer.cornerCurve = kCACornerCurveContinuous;
         self.backgroundColor = [UIColor secondarySystemFillColor];
+        
         UILabel *xL = [UILabel new]; xL.text = @"横向 X"; xL.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold]; xL.textColor = [UIColor secondaryLabelColor]; xL.translatesAutoresizingMaskIntoConstraints = NO;
         _xSlider = [UISlider new]; _xSlider.minimumValue = -150; _xSlider.maximumValue = 150; _xSlider.translatesAutoresizingMaskIntoConstraints = NO;
+        
         UILabel *yL = [UILabel new]; yL.text = @"纵向 Y"; yL.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold]; yL.textColor = [UIColor secondaryLabelColor]; yL.translatesAutoresizingMaskIntoConstraints = NO;
         _ySlider = [UISlider new]; _ySlider.minimumValue = -100; _ySlider.maximumValue = 200; _ySlider.translatesAutoresizingMaskIntoConstraints = NO;
+        
         [self addSubview:xL]; [self addSubview:_xSlider]; [self addSubview:yL]; [self addSubview:_ySlider];
+        
         [NSLayoutConstraint activateConstraints:@[
             [xL.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:16],
             [xL.topAnchor constraintEqualToAnchor:self.topAnchor constant:16],
@@ -103,6 +114,7 @@
             [_xSlider.leadingAnchor constraintEqualToAnchor:xL.trailingAnchor constant:10],
             [_xSlider.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-16],
             [_xSlider.centerYAnchor constraintEqualToAnchor:xL.centerYAnchor],
+            
             [yL.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:16],
             [yL.topAnchor constraintEqualToAnchor:xL.bottomAnchor constant:20],
             [yL.widthAnchor constraintEqualToConstant:40],
@@ -116,7 +128,7 @@
 @end
 
 // ==========================================
-// 组件：主状态卡片
+// 组件 3：主状态大卡片 (TSMainCard)
 // ==========================================
 @interface TSMainCard : UIControl
 @property (nonatomic, strong) UIImageView *iconView;
@@ -124,6 +136,7 @@
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong) UILabel *trafficLabel;
 @property (nonatomic, assign) BOOL isOn;
+- (void)setOn:(BOOL)on animated:(BOOL)animated;
 @end
 
 @implementation TSMainCard
@@ -131,24 +144,29 @@
     if (self = [super initWithFrame:frame]) {
         self.layer.cornerRadius = 24;
         self.layer.cornerCurve = kCACornerCurveContinuous;
+        
         _iconView = [[UIImageView alloc] init];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
         _iconView.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_iconView];
+        
         _titleLabel = [[UILabel alloc] init];
         _titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightHeavy];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_titleLabel];
+        
         _subtitleLabel = [[UILabel alloc] init];
         _subtitleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
         _subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_subtitleLabel];
+        
         _trafficLabel = [[UILabel alloc] init];
         _trafficLabel.font = [UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightMedium];
         _trafficLabel.textColor = [UIColor systemGrayColor];
-        _trafficLabel.text = @"📊 今日已用: 0.00 KB";
+        _trafficLabel.text = @"📊 今日已用: 等待底层抓取...";
         _trafficLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_trafficLabel];
+        
         [NSLayoutConstraint activateConstraints:@[
             [_iconView.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
             [_iconView.topAnchor constraintEqualToAnchor:self.topAnchor constant:20],
@@ -161,6 +179,7 @@
             [_trafficLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
             [_trafficLabel.topAnchor constraintEqualToAnchor:_subtitleLabel.bottomAnchor constant:12]
         ]];
+        
         [self addTarget:self action:@selector(touchDown) forControlEvents:UIControlEventTouchDown];
         [self addTarget:self action:@selector(touchUp) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
     }
@@ -168,9 +187,9 @@
 }
 - (void)touchDown { [UIView animateWithDuration:0.15 animations:^{ self.transform = CGAffineTransformMakeScale(0.95, 0.95); }]; }
 - (void)touchUp { [UIView animateWithDuration:0.15 animations:^{ self.transform = CGAffineTransformIdentity; }]; }
-- (void)setOn:(BOOL)on {
+- (void)setOn:(BOOL)on animated:(BOOL)animated {
     _isOn = on;
-    [UIView transitionWithView:self duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+    void (^updateBlock)(void) = ^{
         if (on) {
             self.backgroundColor = [UIColor systemGreenColor];
             self.iconView.image = [UIImage systemImageNamed:@"speedometer"];
@@ -190,17 +209,30 @@
             self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
             self.trafficLabel.textColor = [UIColor systemGrayColor];
         }
-    } completion:nil];
+    };
+    if (animated) {
+        [UIView transitionWithView:self duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:updateBlock completion:nil];
+    } else {
+        updateBlock();
+    }
 }
 @end
+
+
+// ==========================================
+// RootViewController 主视图控制器
+// ==========================================
+static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
 @implementation RootViewController {
     NSMutableDictionary *_userDefaults;
     BOOL _isRemoteHUDActive;
+    
     TSMainCard *_mainCard;
     TSOffsetCard *_offsetCard;
     NSArray<TSTileButton *> *_posButtons;
     NSArray<TSTileButton *> *_settingButtons;
+    
     UIImpactFeedbackGenerator *_impactFeedbackGenerator;
 }
 
@@ -208,13 +240,21 @@
 + (BOOL)shouldToggleHUDAfterLaunch { return _gShouldToggleHUDAfterLaunch; }
 - (BOOL)isHUDEnabled { return IsHUDEnabled(); }
 - (void)setHUDEnabled:(BOOL)enabled { SetHUDEnabled(enabled); }
+
+// 解决系统下拉菜单、边缘手势被拦截的问题
 - (BOOL)prefersStatusBarHidden { return NO; }
 - (UIRectEdge)preferredScreenEdgesDeferringSystemGestures { return UIRectEdgeNone; }
 
 - (void)registerNotifications {
     int token;
-    notify_register_dispatch(NOTIFY_RELOAD_APP, &token, dispatch_get_main_queue(), ^(int token) { [self loadUserDefaults:YES]; [self reloadAllStatesAnimated:YES]; });
+    notify_register_dispatch(NOTIFY_RELOAD_APP, &token, dispatch_get_main_queue(), ^(int token) {
+        [self loadUserDefaults:YES];
+        [self reloadAllStatesAnimated:YES];
+    });
+    
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(toggleHUDNotificationReceived:) name:kToggleHUDAfterLaunchNotificationName object:nil];
+    
+    // 监听底层发来的流量更新数据
     [[NSNotificationCenter defaultCenter] addObserverForName:@"TrollSpeedUpdateTrafficUI" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
         NSString *totalStr = note.userInfo[@"total"];
         self->_mainCard.trafficLabel.text = [NSString stringWithFormat:@"📊 今日已用: %@", totalStr];
@@ -224,26 +264,39 @@
 - (void)loadView {
     self.view = [[UIView alloc] initWithFrame:UIScreen.mainScreen.bounds];
     self.view.backgroundColor = [UIColor systemBackgroundColor];
+
+    UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    scrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    scrollView.alwaysBounceVertical = YES;
+    scrollView.showsVerticalScrollIndicator = NO;
+    [self.view addSubview:scrollView];
+
     UIStackView *mainStack = [[UIStackView alloc] init];
     mainStack.axis = UILayoutConstraintAxisVertical;
     mainStack.spacing = 15;
     mainStack.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:mainStack];
-    UILayoutGuide *safeArea = self.view.safeAreaLayoutGuide;
+    [scrollView addSubview:mainStack];
+    
     [NSLayoutConstraint activateConstraints:@[
-        [mainStack.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:10],
-        [mainStack.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:24],
-        [mainStack.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-24]
+        [mainStack.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor constant:15],
+        [mainStack.leadingAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.leadingAnchor constant:20],
+        [mainStack.trailingAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.trailingAnchor constant:-20],
+        [mainStack.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor constant:-40]
     ]];
+
+    // 1. 顶部大卡片
     _mainCard = [[TSMainCard alloc] init];
     [_mainCard.heightAnchor constraintEqualToConstant:150].active = YES;
     [_mainCard addTarget:self action:@selector(mainSwitchToggled) forControlEvents:UIControlEventTouchUpInside];
     [mainStack addArrangedSubview:_mainCard];
+
+    // 2. 位置磁贴 (3个)
     UIStackView *posStack = [[UIStackView alloc] init];
     posStack.axis = UILayoutConstraintAxisHorizontal;
     posStack.distribution = UIStackViewDistributionFillEqually;
     posStack.spacing = 10;
     [posStack.heightAnchor constraintEqualToConstant:70].active = YES;
+    
     NSArray *posIcons = @[@"arrow.up.left", @"capsule.portrait", @"arrow.up.right"];
     NSArray *posTitles = @[@"左侧", @"居中", @"右侧"];
     NSMutableArray *tmpPos = [NSMutableArray array];
@@ -258,18 +311,24 @@
     }
     _posButtons = tmpPos;
     [mainStack addArrangedSubview:posStack];
+
+    // 3. 偏移调节卡片
     _offsetCard = [[TSOffsetCard alloc] init];
     [_offsetCard.heightAnchor constraintEqualToConstant:90].active = YES;
     [_offsetCard.xSlider addTarget:self action:@selector(sliderMoved:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
     [_offsetCard.ySlider addTarget:self action:@selector(sliderMoved:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
     [mainStack addArrangedSubview:_offsetCard];
+
+    // 4. 高级设置网格 (3行 x 4列)
     UIStackView *gridStack = [[UIStackView alloc] init];
     gridStack.axis = UILayoutConstraintAxisVertical;
     gridStack.spacing = 10;
+    
     NSArray *tags = @[@100, @101, @110, @103, @102, @104, @106, @109, @105, @107, @108, @111];
     NSArray *icons = @[@"cursorarrow.rays", @"minus", @"paintpalette.fill", @"arrow.up.arrow.down", @"chart.bar.fill", @"textformat.size", @"circle.lefthalf.filled", @"speedometer", @"crop.rotate", @"lock.rotation", @"camera.viewfinder", @"arrow.counterclockwise"];
     NSArray *titles = @[@"穿透", @"单行", @"双色", @"箭头", @"单位", @"大字", @"反色", @"帧率", @"旋转", @"原位", @"防截", @"复位"];
     NSMutableArray *tmpSetting = [NSMutableArray array];
+    
     for (int r = 0; r < 3; r++) {
         UIStackView *row = [[UIStackView alloc] init];
         row.axis = UILayoutConstraintAxisHorizontal;
@@ -282,7 +341,10 @@
             btn.iconView.image = [UIImage systemImageNamed:icons[idx]];
             btn.titleLabel.text = titles[idx];
             btn.tag = [tags[idx] integerValue];
-            if (btn.tag == 111) { btn.iconView.tintColor = [UIColor systemRedColor]; btn.titleLabel.textColor = [UIColor systemRedColor]; }
+            if (btn.tag == 111) {
+                btn.iconView.tintColor = [UIColor systemRedColor];
+                btn.titleLabel.textColor = [UIColor systemRedColor];
+            }
             [btn addTarget:self action:@selector(settingToggled:) forControlEvents:UIControlEventTouchUpInside];
             [row addArrangedSubview:btn];
             [tmpSetting addObject:btn];
@@ -305,40 +367,55 @@
     [self toggleHUDAfterLaunch];
 }
 
+// ==========================================
+// 用户交互与状态更新
+// ==========================================
 - (void)mainSwitchToggled {
-    [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
-    BOOL now = [self isHUDEnabled];
-    [self setHUDEnabled:!now];
-    if (!now) {
-        dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-        int tok;
-        notify_register_dispatch(NOTIFY_LAUNCHED_HUD, &tok, dispatch_get_main_queue(), ^(int t) { notify_cancel(t); dispatch_semaphore_signal(sem); });
+    [_impactFeedbackGenerator prepare];
+    [_impactFeedbackGenerator impactOccurred];
+    
+    BOOL isNowEnabled = [self isHUDEnabled];
+    [self setHUDEnabled:!isNowEnabled];
+    
+    if (!isNowEnabled) {
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        int anyToken;
+        notify_register_dispatch(NOTIFY_LAUNCHED_HUD, &anyToken, dispatch_get_main_queue(), ^(int token) {
+            notify_cancel(token);
+            dispatch_semaphore_signal(semaphore);
+        });
         self.view.userInteractionEnabled = NO;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-            dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)));
-            dispatch_async(dispatch_get_main_queue(), ^{ [self reloadAllStatesAnimated:YES]; self.view.userInteractionEnabled = YES; });
+            dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)));
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self reloadAllStatesAnimated:YES];
+                self.view.userInteractionEnabled = YES;
+            });
         });
     } else {
         self.view.userInteractionEnabled = NO;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self reloadAllStatesAnimated:YES]; self.view.userInteractionEnabled = YES; });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self reloadAllStatesAnimated:YES];
+            self.view.userInteractionEnabled = YES;
+        });
     }
 }
 
 - (void)positionToggled:(TSTileButton *)sender {
     [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
-    HUDPresetPosition cur = [self selectedModeForCurrentOrientation];
-    HUDPresetPosition next = cur;
-    if (sender.tag == 0) next = HUDPresetPositionTopLeft;
-    if (sender.tag == 2) next = HUDPresetPositionTopRight;
-    if (sender.tag == 1) next = (cur == HUDPresetPositionTopCenterMost) ? HUDPresetPositionTopCenter : HUDPresetPositionTopCenterMost;
-    [self setSelectedModeForCurrentOrientation:next];
+    HUDPresetPosition currentMode = [self selectedModeForCurrentOrientation];
+    HUDPresetPosition newMode = currentMode;
+    if (sender.tag == 0) newMode = HUDPresetPositionTopLeft;
+    if (sender.tag == 2) newMode = HUDPresetPositionTopRight;
+    if (sender.tag == 1) newMode = (currentMode == HUDPresetPositionTopCenterMost) ? HUDPresetPositionTopCenter : HUDPresetPositionTopCenterMost;
+    [self setSelectedModeForCurrentOrientation:newMode];
     [self reloadAllStatesAnimated:YES];
 }
 
 - (void)sliderMoved:(UISlider *)sender {
     [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
     [self loadUserDefaults:NO];
-    [_userDefaults setObject:@YES forKey:HUDUserDefaultsKeyUsesCustomOffset];
+    [_userDefaults setObject:@(YES) forKey:HUDUserDefaultsKeyUsesCustomOffset];
     [_userDefaults setObject:@(_offsetCard.xSlider.value) forKey:HUDUserDefaultsKeyRealCustomOffsetX];
     [_userDefaults setObject:@(_offsetCard.ySlider.value) forKey:HUDUserDefaultsKeyRealCustomOffsetY];
     [self saveUserDefaults];
@@ -346,102 +423,218 @@
 
 - (void)settingToggled:(TSTileButton *)sender {
     [_impactFeedbackGenerator prepare]; [_impactFeedbackGenerator impactOccurred];
-    if (sender.tag == 111) {
+    
+    if (sender.tag == 111) { // 恢复默认坐标与设置
         [self loadUserDefaults:NO];
-        [_userDefaults setObject:@NO forKey:HUDUserDefaultsKeyUsesCustomOffset];
-        [_userDefaults setObject:@0 forKey:HUDUserDefaultsKeyRealCustomOffsetX];
-        [_userDefaults setObject:@0 forKey:HUDUserDefaultsKeyRealCustomOffsetY];
-        [self saveUserDefaults]; [self reloadAllStatesAnimated:YES]; return;
+        [_userDefaults setObject:@(NO) forKey:HUDUserDefaultsKeyUsesCustomOffset];
+        [_userDefaults setObject:@(0) forKey:HUDUserDefaultsKeyRealCustomOffsetX];
+        [_userDefaults setObject:@(0) forKey:HUDUserDefaultsKeyRealCustomOffsetY];
+        [self saveUserDefaults];
+        _offsetCard.xSlider.value = 0;
+        _offsetCard.ySlider.value = 0;
+        [self reloadAllStatesAnimated:YES];
+        return;
     }
-    BOOL next = !sender.isOn;
+    
+    BOOL newState = !sender.isOn;
     switch (sender.tag) {
-        case 100: [self setPassthroughMode:next]; break;
-        case 101: [self setSingleLineMode:next]; break;
-        case 102: [self setUsesBitrate:next]; break;
-        case 103: [self setUsesArrowPrefixes:next]; break;
-        case 104: [self setUsesLargeFont:next]; break;
-        case 105: [self setUsesRotation:next]; break;
-        case 106: [self setUsesInvertedColor:next]; break;
-        case 107: [self setKeepInPlace:next]; break;
-        case 108: [self setHideAtSnapshot:next]; break;
-        case 109: [self setDisplayMode:next]; break;
-        case 110: [self setUsesDualColor:next]; break;
+        case 100: [self setPassthroughMode:newState]; break;
+        case 101: [self setSingleLineMode:newState]; break;
+        case 102: [self setUsesBitrate:newState]; break;
+        case 103: [self setUsesArrowPrefixes:newState]; break;
+        case 104: [self setUsesLargeFont:newState]; break;
+        case 105: [self setUsesRotation:newState]; break;
+        case 106: [self setUsesInvertedColor:newState]; break;
+        case 107: [self setKeepInPlace:newState]; break;
+        case 108: [self setHideAtSnapshot:newState]; break;
+        case 109: [self setDisplayMode:newState]; break;
+        case 110: [self setUsesDualColor:newState]; break;
     }
-    [self reloadAllStatesAnimated:YES];
+    [sender setOn:newState animated:YES];
 }
 
 - (void)reloadAllStatesAnimated:(BOOL)animated {
     _isRemoteHUDActive = [self isHUDEnabled];
-    [_mainCard setOn:_isRemoteHUDActive];
+    [_mainCard setOn:_isRemoteHUDActive animated:animated];
+    
     HUDPresetPosition mode = [self selectedModeForCurrentOrientation];
     [_posButtons[0] setOn:(mode == HUDPresetPositionTopLeft) animated:animated];
     [_posButtons[2] setOn:(mode == HUDPresetPositionTopRight) animated:animated];
-    BOOL center = (mode == HUDPresetPositionTopCenter || mode == HUDPresetPositionTopCenterMost);
-    [_posButtons[1] setOn:center animated:animated];
+    BOOL isCenter = (mode == HUDPresetPositionTopCenter || mode == HUDPresetPositionTopCenterMost);
+    [_posButtons[1] setOn:isCenter animated:animated];
     _posButtons[1].iconView.image = [UIImage systemImageNamed:(mode == HUDPresetPositionTopCenterMost ? @"capsule.inset.filled" : @"capsule.portrait")];
+
     _offsetCard.xSlider.value = [self usesCustomOffset] ? [self realCustomOffsetX] : 0;
     _offsetCard.ySlider.value = [self usesCustomOffset] ? [self realCustomOffsetY] : 0;
-    for (TSTileButton *b in _settingButtons) {
-        if (b.tag == 111) continue;
-        BOOL on = NO;
-        switch (b.tag) {
-            case 100: on = [self passthroughMode]; break;
-            case 101: on = [self singleLineMode]; break;
-            case 102: on = [self usesBitrate]; break;
-            case 103: on = [self usesArrowPrefixes]; break;
-            case 104: on = [self usesLargeFont]; break;
-            case 105: on = [self usesRotation]; break;
-            case 106: on = [self usesInvertedColor]; break;
-            case 107: on = [self keepInPlace]; break;
-            case 108: on = [self hideAtSnapshot]; break;
-            case 109: on = [self displayMode]; break;
-            case 110: on = [self usesDualColor]; break;
+
+    for (TSTileButton *btn in _settingButtons) {
+        if (btn.tag == 111) continue;
+        BOOL isOn = NO;
+        switch (btn.tag) {
+            case 100: isOn = [self passthroughMode]; break;
+            case 101: isOn = [self singleLineMode]; break;
+            case 102: isOn = [self usesBitrate]; break;
+            case 103: isOn = [self usesArrowPrefixes]; break;
+            case 104: isOn = [self usesLargeFont]; break;
+            case 105: isOn = [self usesRotation]; break;
+            case 106: isOn = [self usesInvertedColor]; break;
+            case 107: isOn = [self keepInPlace]; break;
+            case 108: isOn = [self hideAtSnapshot]; break;
+            case 109: isOn = [self displayMode]; break;
+            case 110: isOn = [self usesDualColor]; break;
         }
-        [b setOn:on animated:animated];
+        [btn setOn:isOn animated:animated];
     }
 }
 
 // ==========================================
-// 补全缺失的方法（核心修复点）
+// 核心修复点：满足旧协议要求的必须实现的方法
 // ==========================================
-- (void)reloadMainButtonState { [self reloadAllStatesAnimated:YES]; }
-- (BOOL)settingHighlightedWithKey:(NSString *)key { [self loadUserDefaults:NO]; return [[_userDefaults objectForKey:key] boolValue]; }
-- (void)settingDidSelectWithKey:(NSString *)key { BOOL h = [self settingHighlightedWithKey:key]; [_userDefaults setObject:@(!h) forKey:key]; [self saveUserDefaults]; [self reloadAllStatesAnimated:YES]; }
-- (void)toggleHUDNotificationReceived:(NSNotification *)note { [self toggleHUDAfterLaunch]; }
-- (void)toggleHUDAfterLaunch { if ([RootViewController shouldToggleHUDAfterLaunch]) { [RootViewController setShouldToggleHUDAfterLaunch:NO]; [self mainSwitchToggled]; [[UIApplication sharedApplication] suspend]; } }
+- (void)reloadMainButtonState {
+    [self reloadAllStatesAnimated:YES];
+}
+
+- (BOOL)settingHighlightedWithKey:(NSString *)key {
+    [self loadUserDefaults:NO];
+    NSNumber *mode = [_userDefaults objectForKey:key];
+    return mode != nil ? [mode boolValue] : NO;
+}
+
+- (void)settingDidSelectWithKey:(NSString *)key {
+    BOOL highlighted = [self settingHighlightedWithKey:key];
+    [_userDefaults setObject:@(!highlighted) forKey:key];
+    [self saveUserDefaults];
+    [self reloadAllStatesAnimated:YES];
+}
 
 // ==========================================
-// 数据持久化方法
+// 生命周期与后台挂起
 // ==========================================
-- (void)loadUserDefaults:(BOOL)f { if (f || !_userDefaults) _userDefaults = [[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] mutableCopy] ?: [NSMutableDictionary dictionary]; }
-- (void)saveUserDefaults { [_userDefaults writeToFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) atomically:YES]; notify_post(NOTIFY_RELOAD_HUD); }
-- (HUDUserDefaultsKey)selectedModeKeyForCurrentOrientation { UIInterfaceOrientation o = self.view.window.windowScene.interfaceOrientation; return UIInterfaceOrientationIsLandscape(o) ? HUDUserDefaultsKeySelectedModeLandscape : HUDUserDefaultsKeySelectedMode; }
-- (HUDPresetPosition)selectedModeForCurrentOrientation { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:[self selectedModeKeyForCurrentOrientation]]; return m ? (HUDPresetPosition)[m integerValue] : HUDPresetPositionTopCenter; }
-- (void)setSelectedModeForCurrentOrientation:(HUDPresetPosition)m { [self loadUserDefaults:NO]; [_userDefaults setObject:@(m) forKey:[self selectedModeKeyForCurrentOrientation]]; [self saveUserDefaults]; }
-- (BOOL)passthroughMode { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyPassthroughMode] boolValue]; }
+- (void)toggleHUDNotificationReceived:(NSNotification *)notification {
+    NSString *toggleAction = notification.userInfo[kToggleHUDAfterLaunchNotificationActionKey];
+    if (!toggleAction) [self toggleHUDAfterLaunch];
+    else if ([toggleAction isEqualToString:kToggleHUDAfterLaunchNotificationActionToggleOn]) [self toggleOnHUDAfterLaunch];
+    else if ([toggleAction isEqualToString:kToggleHUDAfterLaunchNotificationActionToggleOff]) [self toggleOffHUDAfterLaunch];
+}
+
+- (void)toggleHUDAfterLaunch {
+    if ([RootViewController shouldToggleHUDAfterLaunch]) {
+        [RootViewController setShouldToggleHUDAfterLaunch:NO];
+        if (!_isRemoteHUDActive) [self mainSwitchToggled];
+        [[UIApplication sharedApplication] suspend];
+    }
+}
+
+- (void)toggleOnHUDAfterLaunch {
+    if ([RootViewController shouldToggleHUDAfterLaunch]) {
+        [RootViewController setShouldToggleHUDAfterLaunch:NO];
+        if (!_isRemoteHUDActive) [self mainSwitchToggled];
+        [[UIApplication sharedApplication] suspend];
+    }
+}
+
+- (void)toggleOffHUDAfterLaunch {
+    if ([RootViewController shouldToggleHUDAfterLaunch]) {
+        [RootViewController setShouldToggleHUDAfterLaunch:NO];
+        if (_isRemoteHUDActive) [self mainSwitchToggled];
+        [[UIApplication sharedApplication] suspend];
+    }
+}
+
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext>  _Nonnull context) {
+        [self reloadAllStatesAnimated:NO];
+    } completion:nil];
+}
+
+// ==========================================
+// 开发者与属性持久化逻辑
+// ==========================================
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    if (motion == UIEventSubtypeMotionShake) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"开发者选项" message:@"请选择操作" preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"重置所有设置" style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+            NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+            if (bundleIdentifier) {
+                [GetStandardUserDefaults() removePersistentDomainForName:bundleIdentifier];
+                [GetStandardUserDefaults() synchronize];
+            }
+            if ([[NSFileManager defaultManager] removeItemAtPath:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) error:nil]) {
+                [self setHUDEnabled:NO];
+                [[UIApplication sharedApplication] terminateWithSuccess];
+            }
+        }]];
+        [self presentViewController:alert animated:YES completion:nil];
+    }
+}
+
+- (void)loadUserDefaults:(BOOL)forceReload {
+    if (forceReload || !_userDefaults) {
+        _userDefaults = [[NSDictionary dictionaryWithContentsOfFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH))] mutableCopy] ?: [NSMutableDictionary dictionary];
+    }
+}
+
+- (void)saveUserDefaults {
+    [_userDefaults writeToFile:(JBROOT_PATH_NSSTRING(USER_DEFAULTS_PATH)) atomically:YES];
+    notify_post(NOTIFY_RELOAD_HUD);
+}
+
+- (BOOL)isLandscapeOrientation {
+    UIInterfaceOrientation orientation = self.view.window.windowScene.interfaceOrientation;
+    if (orientation == UIInterfaceOrientationUnknown) {
+        return CGRectGetWidth(self.view.bounds) > CGRectGetHeight(self.view.bounds);
+    }
+    return UIInterfaceOrientationIsLandscape(orientation);
+}
+
+- (HUDUserDefaultsKey)selectedModeKeyForCurrentOrientation {
+    return [self isLandscapeOrientation] ? HUDUserDefaultsKeySelectedModeLandscape : HUDUserDefaultsKeySelectedMode;
+}
+
+- (HUDPresetPosition)selectedModeForCurrentOrientation {
+    [self loadUserDefaults:NO];
+    NSNumber *mode = [_userDefaults objectForKey:[self selectedModeKeyForCurrentOrientation]];
+    return mode != nil ? (HUDPresetPosition)[mode integerValue] : HUDPresetPositionTopCenter;
+}
+
+- (void)setSelectedModeForCurrentOrientation:(HUDPresetPosition)selectedMode {
+    [self loadUserDefaults:NO];
+    if ([self isLandscapeOrientation]) {
+        [_userDefaults removeObjectForKey:HUDUserDefaultsKeyCurrentLandscapePositionY];
+    } else {
+        [_userDefaults removeObjectForKey:HUDUserDefaultsKeyCurrentPositionY];
+    }
+    [_userDefaults setObject:@(selectedMode) forKey:[self selectedModeKeyForCurrentOrientation]];
+    [self saveUserDefaults];
+}
+
+// 属性读取与保存
+- (BOOL)passthroughMode { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyPassthroughMode]; return m != nil ? [m boolValue] : NO; }
 - (void)setPassthroughMode:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyPassthroughMode]; [self saveUserDefaults]; }
-- (BOOL)singleLineMode { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeySingleLineMode] boolValue]; }
+- (BOOL)singleLineMode { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeySingleLineMode]; return m != nil ? [m boolValue] : NO; }
 - (void)setSingleLineMode:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeySingleLineMode]; [self saveUserDefaults]; }
-- (BOOL)usesBitrate { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyUsesBitrate] boolValue]; }
+- (BOOL)usesBitrate { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyUsesBitrate]; return m != nil ? [m boolValue] : NO; }
 - (void)setUsesBitrate:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyUsesBitrate]; [self saveUserDefaults]; }
-- (BOOL)usesArrowPrefixes { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyUsesArrowPrefixes] boolValue]; }
+- (BOOL)usesArrowPrefixes { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyUsesArrowPrefixes]; return m != nil ? [m boolValue] : NO; }
 - (void)setUsesArrowPrefixes:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyUsesArrowPrefixes]; [self saveUserDefaults]; }
-- (BOOL)usesLargeFont { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyUsesLargeFont] boolValue]; }
+- (BOOL)usesLargeFont { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyUsesLargeFont]; return m != nil ? [m boolValue] : NO; }
 - (void)setUsesLargeFont:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyUsesLargeFont]; [self saveUserDefaults]; }
-- (BOOL)usesRotation { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyUsesRotation] boolValue]; }
+- (BOOL)usesRotation { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyUsesRotation]; return m != nil ? [m boolValue] : NO; }
 - (void)setUsesRotation:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyUsesRotation]; [self saveUserDefaults]; }
-- (BOOL)usesInvertedColor { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyUsesInvertedColor] boolValue]; }
+- (BOOL)usesInvertedColor { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyUsesInvertedColor]; return m != nil ? [m boolValue] : NO; }
 - (void)setUsesInvertedColor:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyUsesInvertedColor]; [self saveUserDefaults]; }
-- (BOOL)keepInPlace { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyKeepInPlace] boolValue]; }
+- (BOOL)keepInPlace { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyKeepInPlace]; return m != nil ? [m boolValue] : NO; }
 - (void)setKeepInPlace:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyKeepInPlace]; [self saveUserDefaults]; }
-- (BOOL)hideAtSnapshot { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyHideAtSnapshot] boolValue]; }
+- (BOOL)hideAtSnapshot { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyHideAtSnapshot]; return m != nil ? [m boolValue] : NO; }
 - (void)setHideAtSnapshot:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyHideAtSnapshot]; [self saveUserDefaults]; }
-- (BOOL)displayMode { [self loadUserDefaults:NO]; return [_userDefaults[HUDUserDefaultsKeyDisplayMode] boolValue]; }
+- (BOOL)displayMode { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:HUDUserDefaultsKeyDisplayMode]; return m != nil ? [m boolValue] : NO; }
 - (void)setDisplayMode:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyDisplayMode]; [self saveUserDefaults]; }
-- (BOOL)usesDualColor { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:@"HUD_USES_DUAL_COLOR"]; return m ? [m boolValue] : YES; }
+- (BOOL)usesDualColor { [self loadUserDefaults:NO]; NSNumber *m = [_userDefaults objectForKey:@"HUD_USES_DUAL_COLOR"]; return m != nil ? [m boolValue] : YES; }
 - (void)setUsesDualColor:(BOOL)p { [self loadUserDefaults:NO]; [_userDefaults setObject:@(p) forKey:@"HUD_USES_DUAL_COLOR"]; [self saveUserDefaults]; }
 - (BOOL)usesCustomOffset { return [[NSUserDefaults standardUserDefaults] boolForKey:HUDUserDefaultsKeyUsesCustomOffset]; }
 - (CGFloat)realCustomOffsetX { return [[NSUserDefaults standardUserDefaults] doubleForKey:HUDUserDefaultsKeyRealCustomOffsetX]; }
 - (CGFloat)realCustomOffsetY { return [[NSUserDefaults standardUserDefaults] doubleForKey:HUDUserDefaultsKeyRealCustomOffsetY]; }
-- (void)tapAuthorLabel:(UITapGestureRecognizer *)s { if (_isRemoteHUDActive) return; [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://trollspeed.app"] options:@{} completionHandler:nil]; }
+
 @end
