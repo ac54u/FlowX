@@ -2,7 +2,7 @@
 //  RootViewController.mm
 //  TrollSpeed
 //
-//  Refactored with Pure Native Inset Grouped UI (Fixed Crash & Localization)
+//  Refactored with Pure Native Inset Grouped UI (All Options Integrated)
 //
 
 #import <notify.h>
@@ -19,7 +19,6 @@
 
 static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
-// 添加 UITableView 协议
 @interface RootViewController () <UITableViewDelegate, UITableViewDataSource>
 @property (nonatomic, strong) UITableView *tableView;
 @end
@@ -29,9 +28,9 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     UILabel *_authorLabel;
     BOOL _supportsCenterMost;
     BOOL _isRemoteHUDActive;
-    HUDRootViewController *_localHUDRootViewController;  // Only for debugging
+    HUDRootViewController *_localHUDRootViewController;
     UIImpactFeedbackGenerator *_impactFeedbackGenerator;
-    UISwitch *_mainSwitch; // 核心开关原生控件
+    UISwitch *_mainSwitch;
 }
 
 + (void)setShouldToggleHUDAfterLaunch:(BOOL)flag
@@ -64,23 +63,18 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(toggleHUDNotificationReceived:) name:kToggleHUDAfterLaunchNotificationName object:nil];
 }
 
-// ==========================================
-// 原生质感 UI 初始化
-// ==========================================
 - (void)loadView
 {
     CGRect bounds = UIScreen.mainScreen.bounds;
     self.view = [[UIView alloc] initWithFrame:bounds];
     self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
 
-    // 1. 创建原生的 Inset Grouped TableView
     self.tableView = [[UITableView alloc] initWithFrame:bounds style:UITableViewStyleInsetGrouped];
     self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
     [self.view addSubview:self.tableView];
 
-    // 2. 头部大标题
     UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 80)];
     UILabel *headerLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 20, bounds.size.width - 40, 40)];
     headerLabel.text = @"TrollSpeed";
@@ -90,7 +84,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [headerView addSubview:headerLabel];
     self.tableView.tableHeaderView = headerView;
 
-    // 3. 底部致谢 (放弃 AutoLayout，改用 frame 避免某些情况下的约束闪退)
     UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, bounds.size.width, 100)];
     _authorLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, 10, bounds.size.width - 40, 80)];
     _authorLabel.numberOfLines = 0;
@@ -105,7 +98,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [_authorLabel addGestureRecognizer:tap];
     self.tableView.tableFooterView = footerView;
 
-    // 4. 初始化核心 UISwitch
     _mainSwitch = [[UISwitch alloc] init];
     [_mainSwitch addTarget:self action:@selector(mainSwitchToggled:) forControlEvents:UIControlEventValueChanged];
 }
@@ -128,25 +120,23 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 // ==========================================
-// UITableView DataSource & Delegate (完全中文化)
+// UITableView DataSource & Delegate
 // ==========================================
-
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return (self.traitCollection.verticalSizeClass == UIUserInterfaceSizeClassCompact) ? 2 : 3;
+    return 3; 
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1; 
     if (section == 1) return 3; 
-    if (section == 2) return 1; 
+    if (section == 2) return 10; // 10 个高级选项
     return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    // 修复：直接输出中文
     if (section == 0) return @"运行状态";
     if (section == 1) return @"显示位置";
-    if (section == 2) return @"高级选项";
+    if (section == 2) return @"高级设置";
     return nil;
 }
 
@@ -162,7 +152,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 
     if (indexPath.section == 0) {
-        // 修复：直接输出中文
         NSString *title = _isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
@@ -184,7 +173,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         NSString *iconName = @"";
         BOOL isSelected = NO;
 
-        // 修复：直接输出中文
         if (indexPath.row == 0) {
             title = @"左上角";
             iconName = @"arrow.up.left";
@@ -212,18 +200,43 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         cell.accessoryType = isSelected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     }
     else if (indexPath.section == 2) {
-        // 修复：直接输出中文
+        // ==========================================
+        // 集成所有底部的 10 个高级设置选项
+        // ==========================================
+        UISwitch *optionSwitch = [[UISwitch alloc] init];
+        optionSwitch.tag = indexPath.row;
+        [optionSwitch addTarget:self action:@selector(advancedOptionToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = optionSwitch;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+        NSString *title = @"";
+        NSString *iconName = @"";
+        BOOL isOn = NO;
+
+        switch (indexPath.row) {
+            case 0: title = @"穿透模式"; iconName = @"cursorarrow.rays"; isOn = [self passthroughMode]; break;
+            case 1: title = @"单行模式"; iconName = @"text.alignleft"; isOn = [self singleLineMode]; break;
+            case 2: title = @"显示网速单位"; iconName = @"chart.bar"; isOn = [self usesBitrate]; break;
+            case 3: title = @"箭头指示"; iconName = @"arrow.up.arrow.down"; isOn = [self usesArrowPrefixes]; break;
+            case 4: title = @"大字体"; iconName = @"textformat.size"; isOn = [self usesLargeFont]; break;
+            case 5: title = @"使用屏幕旋转"; iconName = @"crop.rotate"; isOn = [self usesRotation]; break;
+            case 6: title = @"反转颜色"; iconName = @"circle.lefthalf.filled"; isOn = [self usesInvertedColor]; break;
+            case 7: title = @"原位保持"; iconName = @"lock"; isOn = [self keepInPlace]; break;
+            case 8: title = @"截图时隐藏"; iconName = @"camera.viewfinder"; isOn = [self hideAtSnapshot]; break;
+            case 9: title = @"显示模式"; iconName = @"eye"; isOn = [self displayMode]; break;
+        }
+
         if (@available(iOS 14.0, *)) {
             UIListContentConfiguration *config = [cell defaultContentConfiguration];
-            config.text = @"高级设置";
-            config.image = [UIImage systemImageNamed:@"gear"];
+            config.text = title;
+            config.image = [UIImage systemImageNamed:iconName];
             config.imageProperties.tintColor = [UIColor systemGrayColor];
             cell.contentConfiguration = config;
         } else {
-            cell.textLabel.text = @"高级设置";
-            cell.imageView.image = [UIImage systemImageNamed:@"gear"];
+            cell.textLabel.text = title;
+            cell.imageView.image = [UIImage systemImageNamed:iconName];
         }
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        [optionSwitch setOn:isOn animated:NO];
     }
 
     return cell;
@@ -250,8 +263,22 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         }
         [self reloadModeButtonState];
     }
-    else if (indexPath.section == 2) {
-        [self tapSettingsButton:nil];
+}
+
+// 高级选项开关切换逻辑
+- (void)advancedOptionToggled:(UISwitch *)sender {
+    BOOL isOn = sender.isOn;
+    switch (sender.tag) {
+        case 0: [self setPassthroughMode:isOn]; break;
+        case 1: [self setSingleLineMode:isOn]; break;
+        case 2: [self setUsesBitrate:isOn]; break;
+        case 3: [self setUsesArrowPrefixes:isOn]; break;
+        case 4: [self setUsesLargeFont:isOn]; break;
+        case 5: [self setUsesRotation:isOn]; break;
+        case 6: [self setUsesInvertedColor:isOn]; break;
+        case 7: [self setKeepInPlace:isOn]; break;
+        case 8: [self setHideAtSnapshot:isOn]; break;
+        case 9: [self setDisplayMode:isOn]; break;
     }
 }
 
@@ -260,7 +287,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 // ==========================================
 - (void)mainSwitchToggled:(UISwitch *)sender {
     BOOL intendedState = sender.isOn;
-    // UI上先恢复，防止状态还没生效就改变
     [sender setOn:_isRemoteHUDActive animated:NO]; 
     if (intendedState != _isRemoteHUDActive) {
         [self toggleMainHUDState];
@@ -327,7 +353,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             NSParagraphStyleAttributeName: creditsParaStyle,
         };
 
-        // 修复：翻译为中文
         NSString *hintText = @"现在可以退出此 App，\n悬浮窗将持续在屏幕上显示。";
         hintAttributedString = [[NSAttributedString alloc] initWithString:hintText attributes:defaultAttributes];
 
@@ -368,7 +393,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         __strong typeof(weakSelf) strongSelf = weakSelf;
         [strongSelf->_mainSwitch setOn:strongSelf->_isRemoteHUDActive animated:YES];
         
-        // 【关键修复点】：绝对不能在动画块里使用 reloadRows，会直接闪退！改为直接拿到 Cell 并修改文本
         UITableViewCell *cell = [strongSelf.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
         if (cell) {
             NSString *titleText = strongSelf->_isRemoteHUDActive ? @"悬浮窗已开启" : @"悬浮窗已关闭";
@@ -453,23 +477,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [[UIApplication sharedApplication] openURL:repoURL options:@{} completionHandler:nil];
 }
 
-- (void)tapSettingsButton:(id)sender
-{
-    if (!self.view.userInteractionEnabled) return;
-
-    log_debug(OS_LOG_DEFAULT, "- [RootViewController tapSettingsButton]");
-
-    TSSettingsController *settingsViewController = [[TSSettingsController alloc] init];
-    settingsViewController.delegate = self;
-    settingsViewController.alreadyLaunched = _isRemoteHUDActive;
-
-    SPLarkTransitioningDelegate *transitioningDelegate = [[SPLarkTransitioningDelegate alloc] init];
-    settingsViewController.transitioningDelegate = transitioningDelegate;
-    settingsViewController.modalPresentationStyle = UIModalPresentationCustom;
-    settingsViewController.modalPresentationCapturesStatusBarAppearance = YES;
-    [self presentViewController:settingsViewController animated:YES completion:nil];
-}
-
 - (void)verticalSizeClassUpdated
 {
     [self.tableView reloadData];
@@ -490,7 +497,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 }
 
 // ==========================================
-// 开发者与原设 UserDefaults 逻辑 (保留)
+// 开发者与 UserDefaults 逻辑
 // ==========================================
 - (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
     if (motion == UIEventSubtypeMotionShake) {
