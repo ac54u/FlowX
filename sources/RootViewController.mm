@@ -258,6 +258,11 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 - (BOOL)prefersStatusBarHidden { return NO; }
 - (UIRectEdge)preferredScreenEdgesDeferringSystemGestures { return UIRectEdgeNone; }
 
+// 修复：强制状态栏文字显示为深色（黑色），解决白色背景下看不清的问题
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    return UIStatusBarStyleDarkContent;
+}
+
 - (void)registerNotifications {
     int token;
     notify_register_dispatch(NOTIFY_RELOAD_APP, &token, dispatch_get_main_queue(), ^(int token) {
@@ -370,7 +375,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
     NSMutableArray *allRows = [NSMutableArray array];
 
-    // 3. 分组 1: 外观与显示 (Appearance) - 移除“显示模式”
+    // 3. 分组 1: 外观与显示 (Appearance) - 移除“显示模式”和“双色引擎渲染”
     UILabel *header1 = [UILabel new];
     header1.text = @"外观与显示";
     header1.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
@@ -385,15 +390,14 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     group1.layer.masksToBounds = YES;
     [mainStack addArrangedSubview:group1];
 
-    TSSettingRowView *r1 = [self createRowWithIcon:@"paintpalette.fill" color:[UIColor systemOrangeColor] title:@"双色引擎渲染" tag:110 isLast:NO];
     TSSettingRowView *r2 = [self createRowWithIcon:@"minus" color:[UIColor systemGreenColor] title:@"单行紧凑显示" tag:101 isLast:NO];
     TSSettingRowView *r3 = [self createRowWithIcon:@"textformat.size" color:[UIColor systemBlueColor] title:@"大字体模式" tag:104 isLast:NO];
     TSSettingRowView *r4 = [self createRowWithIcon:@"arrow.up.arrow.down" color:[UIColor systemGrayColor] title:@"经典箭头前缀" tag:103 isLast:NO];
     TSSettingRowView *r5 = [self createRowWithIcon:@"chart.bar.fill" color:[UIColor systemTealColor] title:@"数据单位 (KB/s)" tag:102 isLast:YES];
     
-    [group1 addArrangedSubview:r1]; [group1 addArrangedSubview:r2]; [group1 addArrangedSubview:r3];
+    [group1 addArrangedSubview:r2]; [group1 addArrangedSubview:r3];
     [group1 addArrangedSubview:r4]; [group1 addArrangedSubview:r5];
-    [allRows addObjectsFromArray:@[r1, r2, r3, r4, r5]];
+    [allRows addObjectsFromArray:@[r2, r3, r4, r5]];
 
     // 4. 分组 2: 行为与控制 (Behavior) - 移除“位置锁定”
     UILabel *header2 = [UILabel new];
@@ -419,17 +423,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [allRows addObjectsFromArray:@[r6, r7, r8, r9]];
     
     self.settingRows = allRows;
-
-    // 5. 底部按钮区 (Reset)
-    UIButton *resetBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [resetBtn setTitle:@"重置拖拽坐标" forState:UIControlStateNormal];
-    resetBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    [resetBtn setTitleColor:[UIColor systemRedColor] forState:UIControlStateNormal];
-    resetBtn.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-    resetBtn.layer.cornerRadius = 12;
-    [resetBtn.heightAnchor constraintEqualToConstant:46].active = YES;
-    [resetBtn addTarget:self action:@selector(resetPositionTapped) forControlEvents:UIControlEventTouchUpInside];
-    [mainStack addArrangedSubview:resetBtn];
 }
 
 - (void)viewDidLoad {
@@ -486,16 +479,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     [self reloadAllStatesAnimated:YES];
 }
 
-- (void)resetPositionTapped {
-    [self.impactFeedbackGenerator prepare]; [self.impactFeedbackGenerator impactOccurred];
-    [self loadUserDefaults:NO];
-    [self.userDefaults setObject:@(NO) forKey:@"HUDUserDefaultsKeyUsesCustomOffset"];
-    [self.userDefaults setObject:@(0) forKey:@"HUDUserDefaultsKeyRealCustomOffsetX"];
-    [self.userDefaults setObject:@(0) forKey:@"HUDUserDefaultsKeyRealCustomOffsetY"];
-    [self saveUserDefaults];
-    [self reloadAllStatesAnimated:YES];
-}
-
 - (void)settingToggled:(UISwitch *)sender {
     [self.impactFeedbackGenerator prepare]; [self.impactFeedbackGenerator impactOccurred];
     BOOL newState = sender.isOn;
@@ -508,7 +491,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         case 105: [self setUsesRotation:newState]; break;
         case 106: [self setUsesInvertedColor:newState]; break;
         case 108: [self setHideAtSnapshot:newState]; break;
-        case 110: [self setUsesDualColor:newState]; break;
     }
 }
 
@@ -533,7 +515,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             case 105: isOn = [self usesRotation]; break;
             case 106: isOn = [self usesInvertedColor]; break;
             case 108: isOn = [self hideAtSnapshot]; break;
-            case 110: isOn = [self usesDualColor]; break;
         }
         [row.toggleSwitch setOn:isOn animated:animated];
     }
@@ -588,8 +569,6 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 - (void)setHideAtSnapshot:(BOOL)p { [self loadUserDefaults:NO]; [self.userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyHideAtSnapshot]; [self saveUserDefaults]; }
 - (BOOL)displayMode { [self loadUserDefaults:NO]; NSNumber *m = [self.userDefaults objectForKey:HUDUserDefaultsKeyDisplayMode]; return m != nil ? [m boolValue] : NO; }
 - (void)setDisplayMode:(BOOL)p { [self loadUserDefaults:NO]; [self.userDefaults setObject:@(p) forKey:HUDUserDefaultsKeyDisplayMode]; [self saveUserDefaults]; }
-- (BOOL)usesDualColor { [self loadUserDefaults:NO]; NSNumber *m = [self.userDefaults objectForKey:@"HUD_USES_DUAL_COLOR"]; return m != nil ? [m boolValue] : YES; }
-- (void)setUsesDualColor:(BOOL)p { [self loadUserDefaults:NO]; [self.userDefaults setObject:@(p) forKey:@"HUD_USES_DUAL_COLOR"]; [self saveUserDefaults]; }
 
 - (CGFloat)currentPositionY { [self loadUserDefaults:NO]; NSNumber *positionY = [self.userDefaults objectForKey:HUDUserDefaultsKeyCurrentPositionY]; return positionY != nil ? [positionY doubleValue] : CGFLOAT_MAX; }
 - (void)setCurrentPositionY:(CGFloat)positionY { [self loadUserDefaults:NO]; [self.userDefaults setObject:[NSNumber numberWithDouble:positionY] forKey:HUDUserDefaultsKeyCurrentPositionY]; [self saveUserDefaults]; }
