@@ -1,9 +1,9 @@
 //
 //  RootViewController.mm
-//  TrollSpeed - Modern Premium UI Edition
+//  TrollSpeed - Modern Static Grouped Edition
 //
-//  打破九宫格，采用 iOS 15+ 现代原生分组列表 (Inset Grouped) 设计
-//  注重呼吸感、色彩层级与专业交互逻辑。
+//  打破网格，采用静态不可滑动的原生分组 UI。
+//  已移除“显示模式”和“锁定位置”开关，完美适配一屏展示。
 //
 
 #import <notify.h>
@@ -48,12 +48,12 @@
         [contentContainer addSubview:_iconView];
         
         _titleLabel = [[UILabel alloc] init];
-        _titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBlack];
+        _titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBlack];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [contentContainer addSubview:_titleLabel];
         
         _subtitleLabel = [[UILabel alloc] init];
-        _subtitleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        _subtitleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
         _subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [contentContainer addSubview:_subtitleLabel];
         
@@ -72,8 +72,8 @@
             
             [_iconView.leadingAnchor constraintEqualToAnchor:contentContainer.leadingAnchor],
             [_iconView.centerYAnchor constraintEqualToAnchor:contentContainer.centerYAnchor],
-            [_iconView.widthAnchor constraintEqualToConstant:48],
-            [_iconView.heightAnchor constraintEqualToConstant:48],
+            [_iconView.widthAnchor constraintEqualToConstant:44],
+            [_iconView.heightAnchor constraintEqualToConstant:44],
             
             [_titleLabel.leadingAnchor constraintEqualToAnchor:_iconView.trailingAnchor constant:16],
             [_titleLabel.topAnchor constraintEqualToAnchor:contentContainer.topAnchor constant:6],
@@ -82,7 +82,7 @@
             [_subtitleLabel.bottomAnchor constraintEqualToAnchor:contentContainer.bottomAnchor constant:-6],
             
             [_trafficLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:24],
-            [_trafficLabel.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-20]
+            [_trafficLabel.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-16]
         ]];
         
         [self addTarget:self action:@selector(touchDown) forControlEvents:UIControlEventTouchDown];
@@ -102,7 +102,7 @@
             self.titleLabel.textColor = [UIColor whiteColor];
             self.titleLabel.text = @"悬浮窗运行中";
             self.subtitleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.8];
-            self.subtitleLabel.text = @"轻触卡片关闭 · 可在屏幕任意拖动";
+            self.subtitleLabel.text = @"轻触卡片关闭 · 屏幕任意位置自由拖动";
             self.trafficLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.9];
         } else {
             self.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
@@ -204,7 +204,7 @@
         
         _titleLabel = [UILabel new];
         _titleLabel.text = title;
-        _titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightRegular];
+        _titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
         _titleLabel.textColor = [UIColor labelColor];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:_titleLabel];
@@ -216,13 +216,13 @@
         [NSLayoutConstraint activateConstraints:@[
             [_iconContainer.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:16],
             [_iconContainer.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-            [_iconContainer.widthAnchor constraintEqualToConstant:30],
-            [_iconContainer.heightAnchor constraintEqualToConstant:30],
+            [_iconContainer.widthAnchor constraintEqualToConstant:28],
+            [_iconContainer.heightAnchor constraintEqualToConstant:28],
             
             [_iconView.centerXAnchor constraintEqualToAnchor:_iconContainer.centerXAnchor],
             [_iconView.centerYAnchor constraintEqualToAnchor:_iconContainer.centerYAnchor],
-            [_iconView.widthAnchor constraintEqualToConstant:20],
-            [_iconView.heightAnchor constraintEqualToConstant:20],
+            [_iconView.widthAnchor constraintEqualToConstant:18],
+            [_iconView.heightAnchor constraintEqualToConstant:18],
             
             [_titleLabel.leadingAnchor constraintEqualToAnchor:_iconContainer.trailingAnchor constant:16],
             [_titleLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
@@ -295,7 +295,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     TSSettingRowView *row = [[TSSettingRowView alloc] initWithIcon:icon color:color title:title];
     row.toggleSwitch.tag = tag;
     [row.toggleSwitch addTarget:self action:@selector(settingToggled:) forControlEvents:UIControlEventValueChanged];
-    [row.heightAnchor constraintEqualToConstant:50].active = YES;
+    [row.heightAnchor constraintEqualToConstant:46].active = YES;
     
     if (!isLast) {
         UIView *separator = [UIView new];
@@ -314,30 +314,25 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
 - (void)loadView {
     self.view = [[UIView alloc] initWithFrame:UIScreen.mainScreen.bounds];
-    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor]; // 原生灰色背景
+    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
 
-    UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
-    scrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    scrollView.alwaysBounceVertical = YES;
-    scrollView.showsVerticalScrollIndicator = NO;
-    [self.view addSubview:scrollView];
-
+    // 彻底摒弃 UIScrollView，采用绝对安全的固定式 AutoLayout 布局
     UIStackView *mainStack = [[UIStackView alloc] init];
     mainStack.axis = UILayoutConstraintAxisVertical;
-    mainStack.spacing = 24;
+    mainStack.spacing = 16;
     mainStack.translatesAutoresizingMaskIntoConstraints = NO;
-    [scrollView addSubview:mainStack];
+    [self.view addSubview:mainStack];
     
+    UILayoutGuide *safeArea = self.view.safeAreaLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [mainStack.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor constant:20],
-        [mainStack.leadingAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.leadingAnchor constant:20],
-        [mainStack.trailingAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.trailingAnchor constant:-20],
-        [mainStack.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor constant:-40]
+        [mainStack.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:10],
+        [mainStack.leadingAnchor constraintEqualToAnchor:safeArea.leadingAnchor constant:20],
+        [mainStack.trailingAnchor constraintEqualToAnchor:safeArea.trailingAnchor constant:-20]
     ]];
 
     // 1. 英雄大卡片
     self.mainCard = [[TSHeroCard alloc] init];
-    [self.mainCard.heightAnchor constraintEqualToConstant:150].active = YES;
+    [self.mainCard.heightAnchor constraintEqualToConstant:130].active = YES;
     [self.mainCard addTarget:self action:@selector(mainSwitchToggled) forControlEvents:UIControlEventTouchUpInside];
     [mainStack addArrangedSubview:self.mainCard];
 
@@ -346,7 +341,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     segmentContainer.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
     segmentContainer.layer.cornerRadius = 14;
     segmentContainer.layer.cornerCurve = kCACornerCurveContinuous;
-    [segmentContainer.heightAnchor constraintEqualToConstant:50].active = YES;
+    [segmentContainer.heightAnchor constraintEqualToConstant:46].active = YES;
     [mainStack addArrangedSubview:segmentContainer];
     
     UIStackView *posStack = [[UIStackView alloc] init];
@@ -355,10 +350,10 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     posStack.translatesAutoresizingMaskIntoConstraints = NO;
     [segmentContainer addSubview:posStack];
     [NSLayoutConstraint activateConstraints:@[
-        [posStack.topAnchor constraintEqualToAnchor:segmentContainer.topAnchor constant:4],
-        [posStack.bottomAnchor constraintEqualToAnchor:segmentContainer.bottomAnchor constant:-4],
-        [posStack.leadingAnchor constraintEqualToAnchor:segmentContainer.leadingAnchor constant:4],
-        [posStack.trailingAnchor constraintEqualToAnchor:segmentContainer.trailingAnchor constant:-4]
+        [posStack.topAnchor constraintEqualToAnchor:segmentContainer.topAnchor constant:3],
+        [posStack.bottomAnchor constraintEqualToAnchor:segmentContainer.bottomAnchor constant:-3],
+        [posStack.leadingAnchor constraintEqualToAnchor:segmentContainer.leadingAnchor constant:3],
+        [posStack.trailingAnchor constraintEqualToAnchor:segmentContainer.trailingAnchor constant:-3]
     ]];
     
     NSArray *posTitles = @[@"居左停靠", @"屏幕居中", @"居右停靠"];
@@ -375,13 +370,13 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
 
     NSMutableArray *allRows = [NSMutableArray array];
 
-    // 3. 分组 1: 外观与显示 (Appearance)
+    // 3. 分组 1: 外观与显示 (Appearance) - 移除“显示模式”
     UILabel *header1 = [UILabel new];
     header1.text = @"外观与显示";
     header1.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
     header1.textColor = [UIColor secondaryLabelColor];
     [mainStack addArrangedSubview:header1];
-    [mainStack setCustomSpacing:8 afterView:header1];
+    [mainStack setCustomSpacing:6 afterView:header1];
 
     UIStackView *group1 = [[UIStackView alloc] init];
     group1.axis = UILayoutConstraintAxisVertical;
@@ -390,24 +385,23 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     group1.layer.masksToBounds = YES;
     [mainStack addArrangedSubview:group1];
 
-    TSSettingRowView *r1 = [self createRowWithIcon:@"speedometer" color:[UIColor systemIndigoColor] title:@"显示模式 (网速/帧率)" tag:109 isLast:NO];
-    TSSettingRowView *r2 = [self createRowWithIcon:@"paintpalette.fill" color:[UIColor systemOrangeColor] title:@"双色引擎渲染" tag:110 isLast:NO];
-    TSSettingRowView *r3 = [self createRowWithIcon:@"minus" color:[UIColor systemGreenColor] title:@"单行紧凑显示" tag:101 isLast:NO];
-    TSSettingRowView *r4 = [self createRowWithIcon:@"textformat.size" color:[UIColor systemBlueColor] title:@"大字体模式" tag:104 isLast:NO];
-    TSSettingRowView *r5 = [self createRowWithIcon:@"arrow.up.arrow.down" color:[UIColor systemGrayColor] title:@"经典箭头前缀" tag:103 isLast:NO];
-    TSSettingRowView *r6 = [self createRowWithIcon:@"chart.bar.fill" color:[UIColor systemTealColor] title:@"数据单位 (KB/s)" tag:102 isLast:YES];
+    TSSettingRowView *r1 = [self createRowWithIcon:@"paintpalette.fill" color:[UIColor systemOrangeColor] title:@"双色引擎渲染" tag:110 isLast:NO];
+    TSSettingRowView *r2 = [self createRowWithIcon:@"minus" color:[UIColor systemGreenColor] title:@"单行紧凑显示" tag:101 isLast:NO];
+    TSSettingRowView *r3 = [self createRowWithIcon:@"textformat.size" color:[UIColor systemBlueColor] title:@"大字体模式" tag:104 isLast:NO];
+    TSSettingRowView *r4 = [self createRowWithIcon:@"arrow.up.arrow.down" color:[UIColor systemGrayColor] title:@"经典箭头前缀" tag:103 isLast:NO];
+    TSSettingRowView *r5 = [self createRowWithIcon:@"chart.bar.fill" color:[UIColor systemTealColor] title:@"数据单位 (KB/s)" tag:102 isLast:YES];
     
     [group1 addArrangedSubview:r1]; [group1 addArrangedSubview:r2]; [group1 addArrangedSubview:r3];
-    [group1 addArrangedSubview:r4]; [group1 addArrangedSubview:r5]; [group1 addArrangedSubview:r6];
-    [allRows addObjectsFromArray:@[r1, r2, r3, r4, r5, r6]];
+    [group1 addArrangedSubview:r4]; [group1 addArrangedSubview:r5];
+    [allRows addObjectsFromArray:@[r1, r2, r3, r4, r5]];
 
-    // 4. 分组 2: 行为与控制 (Behavior)
+    // 4. 分组 2: 行为与控制 (Behavior) - 移除“位置锁定”
     UILabel *header2 = [UILabel new];
     header2.text = @"行为与控制";
     header2.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
     header2.textColor = [UIColor secondaryLabelColor];
     [mainStack addArrangedSubview:header2];
-    [mainStack setCustomSpacing:8 afterView:header2];
+    [mainStack setCustomSpacing:6 afterView:header2];
 
     UIStackView *group2 = [[UIStackView alloc] init];
     group2.axis = UILayoutConstraintAxisVertical;
@@ -416,26 +410,24 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
     group2.layer.masksToBounds = YES;
     [mainStack addArrangedSubview:group2];
 
-    TSSettingRowView *r7 = [self createRowWithIcon:@"hand.tap.slash.fill" color:[UIColor systemPurpleColor] title:@"触摸事件穿透" tag:100 isLast:NO];
-    TSSettingRowView *r8 = [self createRowWithIcon:@"crop.rotate" color:[UIColor systemYellowColor] title:@"跟随屏幕旋转" tag:105 isLast:NO];
-    TSSettingRowView *r9 = [self createRowWithIcon:@"eye.slash.fill" color:[UIColor systemRedColor] title:@"系统截图隐藏" tag:108 isLast:NO];
-    TSSettingRowView *r10 = [self createRowWithIcon:@"moon.circle.fill" color:[UIColor blackColor] title:@"反色模式" tag:106 isLast:NO];
-    TSSettingRowView *r11 = [self createRowWithIcon:@"lock.fill" color:[UIColor systemPinkColor] title:@"锁定悬浮窗位置" tag:107 isLast:YES];
+    TSSettingRowView *r6 = [self createRowWithIcon:@"hand.tap.slash.fill" color:[UIColor systemPurpleColor] title:@"触摸事件穿透" tag:100 isLast:NO];
+    TSSettingRowView *r7 = [self createRowWithIcon:@"crop.rotate" color:[UIColor systemYellowColor] title:@"跟随屏幕旋转" tag:105 isLast:NO];
+    TSSettingRowView *r8 = [self createRowWithIcon:@"eye.slash.fill" color:[UIColor systemRedColor] title:@"系统截图隐藏" tag:108 isLast:NO];
+    TSSettingRowView *r9 = [self createRowWithIcon:@"moon.circle.fill" color:[UIColor blackColor] title:@"反色模式" tag:106 isLast:YES];
 
-    [group2 addArrangedSubview:r7]; [group2 addArrangedSubview:r8]; [group2 addArrangedSubview:r9];
-    [group2 addArrangedSubview:r10]; [group2 addArrangedSubview:r11];
-    [allRows addObjectsFromArray:@[r7, r8, r9, r10, r11]];
+    [group2 addArrangedSubview:r6]; [group2 addArrangedSubview:r7]; [group2 addArrangedSubview:r8]; [group2 addArrangedSubview:r9];
+    [allRows addObjectsFromArray:@[r6, r7, r8, r9]];
     
     self.settingRows = allRows;
 
     // 5. 底部按钮区 (Reset)
     UIButton *resetBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [resetBtn setTitle:@"重置拖拽坐标" forState:UIControlStateNormal];
-    resetBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    resetBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     [resetBtn setTitleColor:[UIColor systemRedColor] forState:UIControlStateNormal];
     resetBtn.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
     resetBtn.layer.cornerRadius = 12;
-    [resetBtn.heightAnchor constraintEqualToConstant:50].active = YES;
+    [resetBtn.heightAnchor constraintEqualToConstant:46].active = YES;
     [resetBtn addTarget:self action:@selector(resetPositionTapped) forControlEvents:UIControlEventTouchUpInside];
     [mainStack addArrangedSubview:resetBtn];
 }
@@ -515,9 +507,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
         case 104: [self setUsesLargeFont:newState]; break;
         case 105: [self setUsesRotation:newState]; break;
         case 106: [self setUsesInvertedColor:newState]; break;
-        case 107: [self setKeepInPlace:newState]; break;
         case 108: [self setHideAtSnapshot:newState]; break;
-        case 109: [self setDisplayMode:newState]; break;
         case 110: [self setUsesDualColor:newState]; break;
     }
 }
@@ -542,9 +532,7 @@ static BOOL _gShouldToggleHUDAfterLaunch = NO;
             case 104: isOn = [self usesLargeFont]; break;
             case 105: isOn = [self usesRotation]; break;
             case 106: isOn = [self usesInvertedColor]; break;
-            case 107: isOn = [self keepInPlace]; break;
             case 108: isOn = [self hideAtSnapshot]; break;
-            case 109: isOn = [self displayMode]; break;
             case 110: isOn = [self usesDualColor]; break;
         }
         [row.toggleSwitch setOn:isOn animated:animated];
